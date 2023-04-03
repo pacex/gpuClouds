@@ -54,16 +54,66 @@ uniform vec3 viewSpaceLightPosition;
 ///////////////////////////////////////////////////////////////////////////////
 layout(location = 0) out vec4 fragmentColor;
 
-
+vec2 directionToSpherical(vec3 dir){
+	// Calculate the spherical coordinates of the direction
+	float theta = acos(max(-1.0f, min(1.0f, dir.y)));
+	float phi = atan(dir.z, dir.x);
+	if(phi < 0.0f)
+		phi = phi + 2.0f * PI;
+	// Use these to lookup the color in the environment map
+	vec2 lookup = vec2(phi / (2.0 * PI), 1 - theta / PI);
+	return lookup;
+}
 
 vec3 calculateDirectIllumiunation(vec3 wo, vec3 n, vec3 base_color)
 {
-	return vec3(base_color);
+	vec3 wi = viewSpaceLightPosition - viewSpacePosition;
+	float distanceToLight = length(wi);
+	vec3 Li = point_light_intensity_multiplier * point_light_color * (1 / pow(distanceToLight, 2.0));
+
+	wo = normalize(wo);
+	wi = normalize(wi);
+
+	if (dot(n, wi) <= 0.0) return vec3(0.0);
+
+	vec3 diffuse_term = base_color * (1.0 / PI) * dot(n, wi) * Li;
+
+	vec3 wh = normalize(wo + wi);
+
+	float fresnel = material_fresnel + (1.0 - material_fresnel) * pow(1.0 - dot(wh, wi), 5.0);
+	float micrf_distr = ((material_shininess + 2.0) / (2.0 * PI)) * pow(dot(n, wh), material_shininess);
+	float mask = min(1.0, min(2.0 * ((dot(n, wh) * dot(n, wo)) / dot(wo, wh)), 2.0 * ((dot(n, wh) * dot(n, wi)) / dot(wo, wh))));
+
+	float brdf = (fresnel * micrf_distr * mask) / (4.0 * dot(n, wo) * dot(n, wi));
+
+	vec3 dielectric_term = brdf * dot(n, wi) * Li + (1.0 - fresnel) * diffuse_term;
+	vec3 metal_term = brdf * base_color * dot(n, wi) * Li;
+
+
+	return mix(dielectric_term, metal_term, material_metalness);
 }
 
 vec3 calculateIndirectIllumination(vec3 wo, vec3 n, vec3 base_color)
 {
-	return vec3(0.0);
+	vec3 wi = normalize(reflect(wo, n));
+
+	vec3 worldSpaceNormal = (viewInverse * vec4(n, 0.0)).xyz;
+	vec2 lookup = directionToSpherical(worldSpaceNormal);
+
+	vec3 diffuse_term = base_color * (1.0 / PI) * texture(irradianceMap, lookup).rgb;
+
+	float roughness = sqrt(sqrt(2.0 / (material_shininess + 2.0)));
+	vec3 wh = normalize(wo + wi);
+	float fresnel = material_fresnel + (1.0 - material_fresnel) * pow(1.0 - dot(wh, wi), 5.0);
+
+	vec3 worldSpaceWi = (viewInverse * vec4(wi, 0.0)).xyz;
+	lookup = directionToSpherical(worldSpaceWi);
+	vec3 Li = environment_multiplier * textureLod(reflectionMap, lookup, roughness * 7.0).rgb;
+
+	vec3 dielectric_term = fresnel * Li + (1.0 - fresnel) * diffuse_term;
+	vec3 metal_term = fresnel * base_color * Li;
+
+	return mix(dielectric_term, metal_term, material_metalness);
 }
 
 void main()
