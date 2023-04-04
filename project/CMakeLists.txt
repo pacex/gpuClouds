@@ -19,6 +19,8 @@ add_executable ( ${PROJECT_NAME}
     heightfield.h
     ParticleSystem.cpp
     ParticleSystem.h
+    noiseGenerator.cpp
+    noiseGenerator.h
     ${SHADERS}
     )
 
