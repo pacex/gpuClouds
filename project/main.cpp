@@ -22,6 +22,8 @@ using namespace glm;
 #include "hdr.h"
 #include "fbo.h"
 
+#include "noiseGenerator.h"
+
 
 
 
@@ -89,6 +91,12 @@ mat4 fighterModelMatrix;
 
 float shipSpeed = 50;
 
+///////////////////////////////////////////////////////////////////////
+// Cloud Rendering
+///////////////////////////////////////////////////////////////////////
+NoiseGenerator* noiseGen = nullptr;
+float previewLayer = 0.0;
+bool displayPreview = false;
 
 void loadShaders(bool is_reload)
 {
@@ -153,7 +161,12 @@ void initialize()
 
 	glEnable(GL_DEPTH_TEST); // enable Z-buffering
 	glEnable(GL_CULL_FACE);  // enables backface culling
-
+	
+	///////////////////////////////////////////////////////////////////////
+	// Cloud Rendering
+	///////////////////////////////////////////////////////////////////////
+	noiseGen = new NoiseGenerator();
+	noiseGen->renderNoise();
 
 
 }
@@ -279,7 +292,14 @@ void display(void)
 	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	drawBackground(viewMatrix, projMatrix);
+	if (displayPreview) {
+		noiseGen->debugDraw(previewLayer, (float)windowWidth / (float)windowHeight);
+	}
+	else {
+		drawBackground(viewMatrix, projMatrix);
+	}
+
+	
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
 
@@ -400,6 +420,8 @@ void gui()
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
 	            ImGui::GetIO().Framerate);
 	// ----------------------------------------------------------
+	ImGui::Checkbox("Display Noise Texture Preview:", &displayPreview);
+	ImGui::SliderFloat("Noise Texture Preview Layer:", &previewLayer, 0.0, 1.0);
 }
 
 int main(int argc, char* argv[])
