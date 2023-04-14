@@ -44,12 +44,19 @@ int windowWidth, windowHeight;
 ivec2 g_prevMouseCoords = { -1, -1 };
 bool g_isMouseDragging = false;
 
+// Screen Buffer
+unsigned int screenbuffer;
+unsigned int screenColorTexture;
+unsigned int screenDepthTexture;
+
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
 GLuint shaderProgram;       // Shader for rendering the final image
 GLuint simpleShaderProgram; // Shader used to draw the shadow map
 GLuint backgroundProgram;
+GLuint cloudProgram;
+GLuint screenProgram;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
@@ -84,10 +91,12 @@ vec3 worldUp(0.0f, 1.0f, 0.0f);
 ///////////////////////////////////////////////////////////////////////////////
 labhelper::Model* fighterModel = nullptr;
 labhelper::Model* landingpadModel = nullptr;
+labhelper::Model* cloudContainer = nullptr;
 
 mat4 roomModelMatrix;
 mat4 landingPadModelMatrix;
 mat4 fighterModelMatrix;
+mat4 cloudContainerModelMatrix;
 
 float shipSpeed = 50;
 
@@ -119,6 +128,18 @@ void loadShaders(bool is_reload)
 	{
 		shaderProgram = shader;
 	}
+
+	shader = labhelper::loadShaderProgram("../project/cloud.vert", "../project/cloud.frag", is_reload);
+	if (shader != 0)
+	{
+		cloudProgram = shader;
+	}
+
+	shader = labhelper::loadShaderProgram("../project/fullScreenQuad.vert", "../project/screen.frag", is_reload);
+	if (shader != 0)
+	{
+		screenProgram = shader;
+	}
 }
 
 
@@ -136,14 +157,48 @@ void initialize()
 	loadShaders(false);
 
 	///////////////////////////////////////////////////////////////////////
+	//		Screen Buffer
+	///////////////////////////////////////////////////////////////////////
+	int w, h;
+	SDL_GetWindowSize(g_window, &w, &h);
+	if (w != windowWidth || h != windowHeight)
+	{
+		windowWidth = w;
+		windowHeight = h;
+	}
+	
+	
+	glGenTextures(1, &screenColorTexture);
+	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glGenTextures(1, &screenDepthTexture);
+	glBindTexture(GL_TEXTURE_2D, screenDepthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, windowWidth, windowHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	
+	glGenFramebuffers(1, &screenbuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, screenbuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenColorTexture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, screenDepthTexture, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
 	///////////////////////////////////////////////////////////////////////
 	fighterModel = labhelper::loadModelFromOBJ("../scenes/space-ship.obj");
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
+	cloudContainer = labhelper::loadModelFromOBJ("../scenes/cube.obj");
 
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = mat4(1.0f);
+	cloudContainerModelMatrix = mat4(1.0f);
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -193,6 +248,11 @@ void drawBackground(const mat4& viewMatrix, const mat4& projectionMatrix)
 	labhelper::drawFullScreenQuad();
 }
 
+void drawScreenBuffer() {
+	glUseProgram(screenProgram);
+	labhelper::drawFullScreenQuad();
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 /// This function is used to draw the main objects on the scene
@@ -239,6 +299,13 @@ void drawScene(GLuint currentShaderProgram,
 	labhelper::render(fighterModel);
 }
 
+void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4& projectionMatrix) {
+	glUseProgram(shaderProgram);
+	labhelper::setUniformSlow(shaderProgram, "material_color", vec3(1.0));
+	labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
+	labhelper::render(cloudContainer);
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 /// This function will be called once per frame, so the code to set up
@@ -258,6 +325,14 @@ void display(void)
 			windowHeight = h;
 		}
 	}
+	/*
+	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	glBindTexture(GL_TEXTURE_2D, screenDepthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, windowWidth, windowHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	*/
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -283,11 +358,11 @@ void display(void)
 	glActiveTexture(GL_TEXTURE0);
 
 
-
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera
 	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, screenbuffer);
+
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -298,10 +373,23 @@ void display(void)
 	else {
 		drawBackground(viewMatrix, projMatrix);
 	}
-
 	
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
+	glActiveTexture(GL_TEXTURE11);
+	glBindTexture(GL_TEXTURE_2D, screenDepthTexture);
+	glActiveTexture(GL_TEXTURE0);
+
+	glViewport(0, 0, windowWidth, windowHeight);
+	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	drawScreenBuffer();
+	drawCloudContainer(cloudProgram, viewMatrix, projMatrix);
 
 
 
