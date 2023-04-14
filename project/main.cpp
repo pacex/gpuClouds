@@ -325,14 +325,14 @@ void display(void)
 			windowHeight = h;
 		}
 	}
-	/*
+	
 	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, windowWidth, windowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 	glBindTexture(GL_TEXTURE_2D, screenDepthTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, windowWidth, windowHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	*/
+	
 
 
 	///////////////////////////////////////////////////////////////////////////

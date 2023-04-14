@@ -10,5 +10,6 @@ in vec2 texCoord;
 
 void main()
 {	
+	//fragmentColor = vec4(vec3(texture(screenDepth, texCoord).r), 1.0);
 	fragmentColor = texture(screenColor, texCoord);
 }
