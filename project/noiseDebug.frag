@@ -9,4 +9,5 @@ void main()
 {
 	vec4 sampledColor = texture(noiseTexture, vec3(texCoord, layer));
 	fragmentColor = vec4(sampledColor.rgb, 1.0);
+	gl_FragDepth = 0.0;
 }

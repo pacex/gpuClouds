@@ -52,11 +52,10 @@ unsigned int screenDepthTexture;
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
-GLuint shaderProgram;       // Shader for rendering the final image
-GLuint simpleShaderProgram; // Shader used to draw the shadow map
-GLuint backgroundProgram;
-GLuint cloudProgram;
-GLuint screenProgram;
+GLuint shaderProgram;       // Shader for rendering geometry
+GLuint backgroundProgram;	// Shader for rendering environment map as background
+GLuint cloudProgram;		// Shader for rendering cloud container
+GLuint screenProgram;		// Shader for rendering screen buffer to screen
 
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
@@ -68,6 +67,9 @@ const std::string envmap_base_name = "001";
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
+
+// TODO: change to directional light source
+
 vec3 lightPosition;
 vec3 point_light_color = vec3(1.f, 1.f, 1.f);
 
@@ -109,15 +111,7 @@ bool displayPreview = false;
 
 void loadShaders(bool is_reload)
 {
-	GLuint shader = labhelper::loadShaderProgram("../project/simple.vert", "../project/simple.frag",
-	                                             is_reload);
-	if(shader != 0)
-	{
-		simpleShaderProgram = shader;
-	}
-
-	shader = labhelper::loadShaderProgram("../project/fullscreenQuad.vert", "../project/background.frag",
-	                                      is_reload);
+	GLuint shader = labhelper::loadShaderProgram("../project/fullscreenQuad.vert", "../project/background.frag", is_reload);
 	if(shader != 0)
 	{
 		backgroundProgram = shader;
@@ -198,7 +192,7 @@ void initialize()
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = mat4(1.0f);
-	cloudContainerModelMatrix = mat4(1.0f);
+	cloudContainerModelMatrix = translate(48.0f * worldUp) * scale(vec3(32.0f, 8.0f, 32.0f));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -225,19 +219,6 @@ void initialize()
 
 
 }
-
-void debugDrawLight(const glm::mat4& viewMatrix,
-                    const glm::mat4& projectionMatrix,
-                    const glm::vec3& worldSpaceLightPos)
-{
-	mat4 modelMatrix = glm::translate(worldSpaceLightPos);
-	glUseProgram(simpleShaderProgram);
-	labhelper::setUniformSlow(simpleShaderProgram, "modelViewProjectionMatrix",
-	                          projectionMatrix * viewMatrix * modelMatrix);
-	labhelper::setUniformSlow(simpleShaderProgram, "material_color", vec3(1, 1, 1));
-	labhelper::debugDrawSphere();
-}
-
 
 void drawBackground(const mat4& viewMatrix, const mat4& projectionMatrix)
 {
@@ -301,7 +282,9 @@ void drawScene(GLuint currentShaderProgram,
 
 void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4& projectionMatrix) {
 	glUseProgram(shaderProgram);
-	labhelper::setUniformSlow(shaderProgram, "material_color", vec3(1.0));
+	labhelper::setUniformSlow(shaderProgram, "view_inverse", inverse(viewMatrix));
+	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
+	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
 	labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
 	labhelper::render(cloudContainer);
 }
@@ -359,7 +342,7 @@ void display(void)
 
 
 	///////////////////////////////////////////////////////////////////////////
-	// Draw from camera
+	// Draw scene to screen buffer
 	///////////////////////////////////////////////////////////////////////////
 	glBindFramebuffer(GL_FRAMEBUFFER, screenbuffer);
 
@@ -367,17 +350,15 @@ void display(void)
 	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (displayPreview) {
-		noiseGen->debugDraw(previewLayer, (float)windowWidth / (float)windowHeight);
-	}
-	else {
-		drawBackground(viewMatrix, projMatrix);
-	}
-	
+	drawBackground(viewMatrix, projMatrix);
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
-	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+
+	///////////////////////////////////////////////////////////////////////////
+	// Draw screen buffer and render cloud container
+	///////////////////////////////////////////////////////////////////////////
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
 	glActiveTexture(GL_TEXTURE11);
@@ -391,6 +372,9 @@ void display(void)
 	drawScreenBuffer();
 	drawCloudContainer(cloudProgram, viewMatrix, projMatrix);
 
+	if (displayPreview) {
+		noiseGen->debugDraw(previewLayer, (float)windowWidth / (float)windowHeight);
+	}
 
 
 }
