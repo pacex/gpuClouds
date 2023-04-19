@@ -29,7 +29,7 @@ void main()
 	float sampled_depth = texture(screen_depth, screen_position).r;
 
 	// Get view ray intersections with cloud container
-	vec3 model_campos = (model_inverse * view_inverse * vec4(vec3(0.0), 1.0)).xyz;
+	vec3 model_campos = (model_inverse * view_inverse * vec4(vec3(0.0), 1.0)).xyz;		// Perform itsc check in model space to allow for rotation in world space
 	vec3 model_ray = normalize(model_position - model_campos);
 
 	vec3 ts_lower = (vec3(-1.0) - model_campos) / model_ray;

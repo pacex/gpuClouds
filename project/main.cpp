@@ -492,8 +492,16 @@ void gui()
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
 	            ImGui::GetIO().Framerate);
 	// ----------------------------------------------------------
-	ImGui::Checkbox("Display Noise Texture Preview:", &displayPreview);
-	ImGui::SliderFloat("Noise Texture Preview Layer:", &previewLayer, 0.0, 1.0);
+
+	// Noise
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Noise Generation:");
+	ImGui::BeginChild("Scrolling");
+
+	ImGui::Checkbox("Enable Preview", &displayPreview);
+	ImGui::SliderFloat("Preview Z", &previewLayer, 0.0, 1.0);
+
+	ImGui::EndChild();
+
 }
 
 int main(int argc, char* argv[])
