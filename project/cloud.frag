@@ -10,6 +10,7 @@ uniform mat4 model;
 in vec4 clip_position;
 in vec3 model_position;
 
+layout(binding = 9) uniform sampler3D noise;
 layout(binding = 10) uniform sampler2D screen_color;
 layout(binding = 11) uniform sampler2D screen_depth;
 

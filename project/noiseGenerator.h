@@ -19,7 +19,4 @@ private:
 
 	GLuint shader;
 	GLuint debugShader;
-
-	float* generatePointBuffer(int n_cells);
-	float randf();
 };

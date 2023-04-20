@@ -359,6 +359,8 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// Draw screen buffer and render cloud container
 	///////////////////////////////////////////////////////////////////////////
+	glActiveTexture(GL_TEXTURE9);
+	glBindTexture(GL_TEXTURE_3D, noiseGen->noiseTexture);
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
 	glActiveTexture(GL_TEXTURE11);
