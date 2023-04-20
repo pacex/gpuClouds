@@ -49,7 +49,7 @@ void NoiseGenerator::renderNoise() {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void NoiseGenerator::debugDraw(float layer, float screenRatio) {
+void NoiseGenerator::debugDraw(float layer, float screenRatio, int channel) {
 
 	glActiveTexture(GL_TEXTURE9);
 	glBindTexture(GL_TEXTURE_3D, noiseTexture);
@@ -57,5 +57,6 @@ void NoiseGenerator::debugDraw(float layer, float screenRatio) {
 	glUseProgram(debugShader);
 	labhelper::setUniformSlow(debugShader, "layer", layer);
 	labhelper::setUniformSlow(debugShader, "screenRatio", screenRatio);
+	labhelper::setUniformSlow(debugShader, "channel", channel);
 	labhelper::drawFullScreenQuad();
 }

@@ -162,13 +162,26 @@ float perlin(vec3 pos, int N){
 void main()
 {
 	// Compute position in unit cube
-	vec3 pos = vec3(fract(texCoord * 2.0), float(layer) / float(size));
+	vec3 pos = fract(vec3(texCoord, float(layer) / float(size)));
 
 	// Generate different noise frequencies
-	float worleyLow = worley(pos, 8);
 
-	float perlin = perlin(pos, 8);
+	// LOW - PERLIN/WORLEY
+	float perl = 0.0;
+	for(int i = 0; i < 16; i++){
+		perl += perlin(pos, int(pow(2.0, 3.0 + i))) * pow(2.0, -1.0 - i);
+	}
+	float low = 0.25 * worley(pos, 4) + 0.75 * perl;
+
+	// MEDIUM - WORLEY
+	float medium = worley(pos, 14);
+
+	// HIGH - WORLEY
+	float high = worley(pos, 20);
+
+	// HIGHEST - WORLEY
+	float highest = worley(pos, 32);
 
 	// Assemble noise channels
-	fragmentColor = vec4(vec3(perlin), 1.0);
+	fragmentColor = vec4(low, medium, high, highest);
 }

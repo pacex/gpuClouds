@@ -10,7 +10,7 @@ class NoiseGenerator {
 public:
 	NoiseGenerator(void);
 	void renderNoise();
-	void debugDraw(float layer, float screenRatio);
+	void debugDraw(float layer, float screenRatio, int channel);
 
 	unsigned int noiseTexture;
 

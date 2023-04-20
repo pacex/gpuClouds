@@ -108,6 +108,7 @@ float shipSpeed = 50;
 NoiseGenerator* noiseGen = nullptr;
 float previewLayer = 0.0;
 bool displayPreview = false;
+int previewChannel = 0;
 
 void loadShaders(bool is_reload)
 {
@@ -375,7 +376,7 @@ void display(void)
 	drawCloudContainer(cloudProgram, viewMatrix, projMatrix);
 
 	if (displayPreview) {
-		noiseGen->debugDraw(previewLayer, (float)windowWidth / (float)windowHeight);
+		noiseGen->debugDraw(previewLayer, (float)windowWidth / (float)windowHeight, previewChannel);
 	}
 
 
@@ -501,6 +502,7 @@ void gui()
 
 	ImGui::Checkbox("Enable Preview", &displayPreview);
 	ImGui::SliderFloat("Preview Z", &previewLayer, 0.0, 1.0);
+	ImGui::SliderInt("Preview Channel", &previewChannel, 0, 3);
 
 	ImGui::EndChild();
 
