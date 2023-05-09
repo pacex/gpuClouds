@@ -7,17 +7,37 @@ uniform mat4 view_inverse;
 uniform mat4 model_inverse;
 uniform mat4 model;
 
+uniform float density_threshold;
+uniform float density_multiplier;
+uniform int num_steps;
+uniform float cloud_scale;
+uniform float cloud_speed;
+
+uniform float time;
+
 in vec4 clip_position;
 in vec3 model_position;
 
-layout(binding = 9) uniform sampler3D noise;
+layout(binding = 9) uniform sampler3D shapeNoise;
 layout(binding = 10) uniform sampler2D screen_color;
 layout(binding = 11) uniform sampler2D screen_depth;
 
 layout(location = 0) out vec4 fragmentColor;
 
 float beersLaw(float x){
-	return exp(-x / 30.0);
+	return exp(-x);
+}
+
+float remap(float value, float low1, float high1, float low2, float high2){
+	return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
+}
+
+float sampleCloudDensity(vec3 pos){
+	vec3 offset = time * cloud_speed * normalize(vec3(1.0, 0.0, 2.0));
+	vec4 c = texture(shapeNoise, (pos * 0.01 + offset) * cloud_scale);
+
+	//return remap(max(c.r - density_threshold, 0.0), (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) * density_multiplier;
+	return max(0.0, c.r - density_threshold) * density_multiplier;
 }
 
 void main()
@@ -46,14 +66,25 @@ void main()
 	vec3 world_itsc_out = (model * vec4(model_campos + model_ray * t_max, 1.0)).xyz;
 
 	// Ray marching
-	// ...TODO...
+	float density = 0.0;
+
+	vec3 vec_step = (world_itsc_out - world_itsc_in) / num_steps;
+	float size_step = length(vec_step);
+
+	int i = 0;
+	while(i <= num_steps){
+		vec3 sample_pos = world_itsc_in + vec_step * i;
+		density += sampleCloudDensity(sample_pos) * size_step;
+		i++;
+	}
+
 
 	// Shading
-	float mtp = beersLaw(length(world_itsc_out - world_itsc_in));
+	float transmittance = beersLaw(density);
 
 	// Output color
-	//fragmentColor = vec4(vec3(gl_FragCoord.z), 1.0);
+	//fragmentColor = vec4(vec3(mtp), 1.0);
 	vec3 screen_rgb = texture(screen_color, screen_position).rgb;
-	fragmentColor = vec4(screen_rgb * mtp, 1.0);
+	fragmentColor = vec4(screen_rgb * transmittance, 1.0);
 	//fragmentColor = vec4(screen_position, 0.0, 1.0);
 }

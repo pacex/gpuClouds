@@ -70,10 +70,10 @@ const std::string envmap_base_name = "001";
 
 // TODO: change to directional light source
 
-vec3 lightPosition;
-vec3 point_light_color = vec3(1.f, 1.f, 1.f);
+vec3 lightDirection;
+vec3 light_color = vec3(1.f, 1.f, 1.f);
 
-float point_light_intensity_multiplier = 10000.0f;
+float light_intensity_multiplier = 1.0f;
 
 
 
@@ -109,6 +109,12 @@ NoiseGenerator* noiseGen = nullptr;
 float previewLayer = 0.0;
 bool displayPreview = false;
 int previewChannel = 0;
+
+float densityThreshold = 0.45f;
+float densityMultiplier = 0.5f;
+int numSteps = 8;
+float cloudScale = 0.7f;
+float cloudSpeed = 0.05f;
 
 void loadShaders(bool is_reload)
 {
@@ -193,7 +199,7 @@ void initialize()
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = mat4(1.0f);
-	cloudContainerModelMatrix = translate(48.0f * worldUp) * scale(vec3(32.0f, 8.0f, 32.0f));
+	cloudContainerModelMatrix = translate(48.0f * worldUp) * scale(vec3(64.0f, 16.0f, 64.0f));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -241,19 +247,17 @@ void drawScreenBuffer() {
 ///////////////////////////////////////////////////////////////////////////////
 void drawScene(GLuint currentShaderProgram,
                const mat4& viewMatrix,
-               const mat4& projectionMatrix,
-               const mat4& lightViewMatrix,
-               const mat4& lightProjectionMatrix)
+               const mat4& projectionMatrix)
 {
 	glUseProgram(currentShaderProgram);
 	// Light source
-	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
-	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", point_light_color);
+	vec4 viewSpaceLightDirection = viewMatrix * vec4(lightDirection, 0.0f);
+	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", light_color);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_intensity_multiplier",
-	                          point_light_intensity_multiplier);
-	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDir",
-	                          normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+	                          light_intensity_multiplier);
+	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDirection", vec3(viewSpaceLightDirection));
+	//labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDir",
+	                          //normalize(vec3(viewMatrix * vec4(-lightDirection, 0.0f))));
 
 
 	// Environment
@@ -287,6 +291,12 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
 	labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
+	labhelper::setUniformSlow(shaderProgram, "density_threshold", densityThreshold);
+	labhelper::setUniformSlow(shaderProgram, "density_multiplier", densityMultiplier);
+	labhelper::setUniformSlow(shaderProgram, "cloud_scale", cloudScale);
+	labhelper::setUniformSlow(shaderProgram, "cloud_speed", cloudSpeed);
+	labhelper::setUniformSlow(shaderProgram, "num_steps", numSteps);
+	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
 	labhelper::render(cloudContainer);
 }
 
@@ -325,10 +335,14 @@ void display(void)
 	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
+	/*
 	vec4 lightStartPosition = vec4(40.0f, 40.0f, 0.0f, 1.0f);
-	lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
-	mat4 lightViewMatrix = lookAt(lightPosition, vec3(0.0f), worldUp);
+	lightDirection = vec3(rotate(currentTime, worldUp) * lightStartPosition);
+	mat4 lightViewMatrix = lookAt(lightDirection, vec3(0.0f), worldUp);
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
+	*/
+
+	lightDirection = normalize(vec3(1.0f, 1.0f, 0.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Bind the environment map(s) to unused texture units
@@ -352,7 +366,7 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawBackground(viewMatrix, projMatrix);
-	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+	drawScene(shaderProgram, viewMatrix, projMatrix);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -498,13 +512,19 @@ void gui()
 
 	// Noise
 	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Noise Generation:");
-	ImGui::BeginChild("Scrolling");
 
 	ImGui::Checkbox("Enable Preview", &displayPreview);
 	ImGui::SliderFloat("Preview Z", &previewLayer, 0.0, 1.0);
 	ImGui::SliderInt("Preview Channel", &previewChannel, 0, 3);
 
-	ImGui::EndChild();
+	// Cloud Rendering
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Cloud Rendering:");
+
+	ImGui::SliderFloat("Density Threshold", &densityThreshold, 0.0, 1.0);
+	ImGui::SliderFloat("Density Multiplier", &densityMultiplier, 0.0, 2.0);
+	ImGui::SliderInt("#steps", &numSteps, 1, 16);
+	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
+	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.01, 2.0);
 
 }
 

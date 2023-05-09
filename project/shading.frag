@@ -47,7 +47,7 @@ in vec3 viewSpacePosition;
 // Input uniform variables
 ///////////////////////////////////////////////////////////////////////////////
 uniform mat4 viewInverse;
-uniform vec3 viewSpaceLightPosition;
+uniform vec3 viewSpaceLightDirection;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Output color
@@ -67,8 +67,9 @@ vec2 directionToSpherical(vec3 dir){
 
 vec3 calculateDirectIllumiunation(vec3 wo, vec3 n, vec3 base_color)
 {
-	vec3 wi = viewSpaceLightPosition - viewSpacePosition;
-	float distanceToLight = length(wi);
+	vec3 wi = viewSpaceLightDirection;
+	//float distanceToLight = length(wi);
+	float distanceToLight = 1.0;
 	vec3 Li = point_light_intensity_multiplier * point_light_color * (1 / pow(distanceToLight, 2.0));
 
 	wo = normalize(wo);
@@ -107,7 +108,7 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n, vec3 base_color)
 	float fresnel = material_fresnel + (1.0 - material_fresnel) * pow(1.0 - dot(wh, wi), 5.0);
 
 	vec3 worldSpaceWi = (viewInverse * vec4(wi, 0.0)).xyz;
-	lookup = directionToSpherical(worldSpaceWi);
+	lookup = directionToSpherical(worldSpaceWi * vec3(1.0, -1.0, 1.0));
 	vec3 Li = environment_multiplier * textureLod(reflectionMap, lookup, roughness * 7.0).rgb;
 
 	vec3 dielectric_term = fresnel * Li + (1.0 - fresnel) * diffuse_term;
