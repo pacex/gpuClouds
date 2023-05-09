@@ -9,9 +9,13 @@ uniform mat4 model;
 
 uniform float density_threshold;
 uniform float density_multiplier;
+uniform float light_absorption;
 uniform int num_steps;
 uniform float cloud_scale;
 uniform float cloud_speed;
+
+uniform vec3 light_direction;
+uniform vec3 light_color;
 
 uniform float time;
 
@@ -24,8 +28,8 @@ layout(binding = 11) uniform sampler2D screen_depth;
 
 layout(location = 0) out vec4 fragmentColor;
 
-float beersLaw(float x){
-	return exp(-x);
+float beersLaw(float x, float d){
+	return exp(-x * d);
 }
 
 float remap(float value, float low1, float high1, float low2, float high2){
@@ -37,7 +41,40 @@ float sampleCloudDensity(vec3 pos){
 	vec4 c = texture(shapeNoise, (pos * 0.01 + offset) * cloud_scale);
 
 	//return remap(max(c.r - density_threshold, 0.0), (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) * density_multiplier;
+	// TODO: incorporate detail noise
 	return max(0.0, c.r - density_threshold) * density_multiplier;
+}
+
+float marchLightRay(vec3 pos){
+
+	// Determine ray length
+	vec3 model_origin = (model_inverse * vec4(pos, 1.0)).xyz;
+	vec3 model_dir = (transpose(model) * vec4(light_direction, 0.0)).xyz;
+
+	vec3 ts_lower = (vec3(-1.0) - model_origin) / model_dir;
+	vec3 ts_upper = (vec3(1.0) - model_origin) / model_dir;
+
+	vec3 ts_max = vec3(max(ts_lower.x, ts_upper.x), max(ts_lower.y, ts_upper.y), max(ts_lower.z, ts_upper.z));
+	float t_max = min(ts_max.x, min(ts_max.y, ts_max.z));
+	vec3 world_itsc_out = (model * vec4(model_origin + model_dir * t_max, 1.0)).xyz;
+
+	// Ray marching
+	float density = 0.0;
+
+	vec3 vec_step = (world_itsc_out - pos) / num_steps;
+	float size_step = length(vec_step);
+
+	int i = 0;
+	while(i <= num_steps){
+		vec3 sample_pos = pos + vec_step * i;
+		density += sampleCloudDensity(sample_pos) * size_step;
+		i++;
+	}
+
+	// Compute transmittance
+	float transmittance = beersLaw(density, light_absorption);
+
+	return transmittance;
 }
 
 void main()
@@ -65,8 +102,11 @@ void main()
 	vec3 world_itsc_in = (model * vec4(model_campos + model_ray * t_min, 1.0)).xyz;
 	vec3 world_itsc_out = (model * vec4(model_campos + model_ray * t_max, 1.0)).xyz;
 
+
+
 	// Ray marching
-	float density = 0.0;
+	float transmittance = 1.0;
+	float light_energy = 0.0;
 
 	vec3 vec_step = (world_itsc_out - world_itsc_in) / num_steps;
 	float size_step = length(vec_step);
@@ -74,17 +114,26 @@ void main()
 	int i = 0;
 	while(i <= num_steps){
 		vec3 sample_pos = world_itsc_in + vec_step * i;
-		density += sampleCloudDensity(sample_pos) * size_step;
+		float density = sampleCloudDensity(sample_pos);
+
+		if (density > 0.0){
+			float light_transmittance = marchLightRay(sample_pos);
+			light_energy += density * size_step * transmittance * light_transmittance;
+			transmittance *= beersLaw(density * size_step, light_absorption);
+		}
+
 		i++;
 	}
 
 
 	// Shading
-	float transmittance = beersLaw(density);
 
 	// Output color
 	//fragmentColor = vec4(vec3(mtp), 1.0);
 	vec3 screen_rgb = texture(screen_color, screen_position).rgb;
-	fragmentColor = vec4(screen_rgb * transmittance, 1.0);
-	//fragmentColor = vec4(screen_position, 0.0, 1.0);
+	vec3 cloud_rgb = light_color * light_energy;
+
+
+	fragmentColor = vec4(screen_rgb * transmittance + cloud_rgb, 1.0);
+	//fragmentColor = vec4(light_color, 1.0);
 }

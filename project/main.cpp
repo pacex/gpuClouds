@@ -112,6 +112,7 @@ int previewChannel = 0;
 
 float densityThreshold = 0.45f;
 float densityMultiplier = 0.5f;
+float lightAbsorption = 1.0f;
 int numSteps = 8;
 float cloudScale = 0.7f;
 float cloudSpeed = 0.05f;
@@ -291,8 +292,11 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
 	labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
+	labhelper::setUniformSlow(shaderProgram, "light_direction", lightDirection);
+	labhelper::setUniformSlow(shaderProgram, "light_color", light_color);
 	labhelper::setUniformSlow(shaderProgram, "density_threshold", densityThreshold);
 	labhelper::setUniformSlow(shaderProgram, "density_multiplier", densityMultiplier);
+	labhelper::setUniformSlow(shaderProgram, "light_absorption", lightAbsorption);
 	labhelper::setUniformSlow(shaderProgram, "cloud_scale", cloudScale);
 	labhelper::setUniformSlow(shaderProgram, "cloud_speed", cloudSpeed);
 	labhelper::setUniformSlow(shaderProgram, "num_steps", numSteps);
@@ -342,7 +346,7 @@ void display(void)
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 	*/
 
-	lightDirection = normalize(vec3(1.0f, 1.0f, 0.0f));
+	lightDirection = normalize(vec3(1.0f, 1.0f, 1.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Bind the environment map(s) to unused texture units
@@ -525,6 +529,7 @@ void gui()
 	ImGui::SliderInt("#steps", &numSteps, 1, 16);
 	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
 	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.01, 2.0);
+	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
 
 }
 
