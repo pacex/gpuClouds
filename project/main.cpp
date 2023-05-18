@@ -110,12 +110,15 @@ float previewLayer = 0.0;
 bool displayPreview = false;
 int previewChannel = 0;
 
-float densityThreshold = 0.45f;
-float densityMultiplier = 0.5f;
-float lightAbsorption = 1.0f;
-int numSteps = 8;
-float cloudScale = 0.7f;
-float cloudSpeed = 0.05f;
+float densityThreshold = 0.49f;
+float densityMultiplier = 0.823f;
+float lightAbsorption = 1.415f;
+float lightAbsorptionSun = 0.966f;
+float darknessThreshold = 0.367f;
+float stepSize = 4.0f;
+float stepSizeSun = 8.0f;
+float cloudScale = 0.342f;
+float cloudSpeed = 0.118f;
 
 void loadShaders(bool is_reload)
 {
@@ -288,6 +291,7 @@ void drawScene(GLuint currentShaderProgram,
 
 void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4& projectionMatrix) {
 	glUseProgram(shaderProgram);
+	labhelper::setUniformSlow(shaderProgram, "proj_inverse", inverse(projectionMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view_inverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
@@ -297,9 +301,12 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "density_threshold", densityThreshold);
 	labhelper::setUniformSlow(shaderProgram, "density_multiplier", densityMultiplier);
 	labhelper::setUniformSlow(shaderProgram, "light_absorption", lightAbsorption);
+	labhelper::setUniformSlow(shaderProgram, "light_absorption_sun", lightAbsorptionSun);
+	labhelper::setUniformSlow(shaderProgram, "darkness_threshold", darknessThreshold);
 	labhelper::setUniformSlow(shaderProgram, "cloud_scale", cloudScale);
 	labhelper::setUniformSlow(shaderProgram, "cloud_speed", cloudSpeed);
-	labhelper::setUniformSlow(shaderProgram, "num_steps", numSteps);
+	labhelper::setUniformSlow(shaderProgram, "step_size_sun", stepSizeSun);
+	labhelper::setUniformSlow(shaderProgram, "step_size", stepSize);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
 	labhelper::render(cloudContainer);
 }
@@ -391,6 +398,7 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawScreenBuffer();
+	cloudContainerModelMatrix = translate(48.0f * worldUp + vec3(cameraPosition.x, cameraPosition.y, 0.0f)) * scale(vec3(512.0f, 16.0f, 512.0f));
 	drawCloudContainer(cloudProgram, viewMatrix, projMatrix);
 
 	if (displayPreview) {
@@ -526,10 +534,13 @@ void gui()
 
 	ImGui::SliderFloat("Density Threshold", &densityThreshold, 0.0, 1.0);
 	ImGui::SliderFloat("Density Multiplier", &densityMultiplier, 0.0, 2.0);
-	ImGui::SliderInt("#steps", &numSteps, 1, 16);
+	ImGui::SliderFloat("Step Size", &stepSize, 4.0, 32.0);
+	ImGui::SliderFloat("Step Size Sun", &stepSizeSun, 0.1, 64.0);
 	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
 	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.01, 2.0);
 	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
+	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
+	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
 
 }
 
