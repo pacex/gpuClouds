@@ -119,6 +119,8 @@ float stepSize = 4.0f;
 float stepSizeSun = 8.0f;
 float cloudScale = 0.342f;
 float cloudSpeed = 0.118f;
+float forwardScatteringPower = 16.0f;
+float forwardScatteringMultiplier = 0.005f;
 
 void loadShaders(bool is_reload)
 {
@@ -308,6 +310,8 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "step_size_sun", stepSizeSun);
 	labhelper::setUniformSlow(shaderProgram, "step_size", stepSize);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
+	labhelper::setUniformSlow(shaderProgram, "forward_scattering_power", forwardScatteringPower);
+	labhelper::setUniformSlow(shaderProgram, "forward_scattering_multiplier", forwardScatteringMultiplier);
 	labhelper::render(cloudContainer);
 }
 
@@ -541,6 +545,8 @@ void gui()
 	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
 	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
 	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
+	ImGui::SliderFloat("Fwd. Sc. Pow.", &forwardScatteringPower, 0.0, 64.0);
+	ImGui::SliderFloat("Fwd. Sc. Mtp.", &forwardScatteringMultiplier, 0.0, 0.01);
 
 }
 

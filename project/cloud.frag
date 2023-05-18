@@ -17,6 +17,8 @@ uniform float step_size_sun;
 uniform float step_size;
 uniform float cloud_scale;
 uniform float cloud_speed;
+uniform float forward_scattering_power;
+uniform float forward_scattering_multiplier;
 
 uniform vec3 light_direction;
 uniform vec3 light_color;
@@ -135,7 +137,8 @@ void main()
 
 		if (density > 0.0){
 			float light_transmittance = marchLightRay(sample_pos);
-			light_energy += density * step_size * transmittance * light_transmittance;
+			float forward_scattering = pow(dot(ray_direction, normalize(light_direction)) * 0.5 + 0.5, forward_scattering_power);
+			light_energy += (density * transmittance * light_transmittance + forward_scattering * forward_scattering_multiplier) * step_size;
 			transmittance *= beersLaw(density * step_size, light_absorption);
 		}
 
@@ -148,7 +151,8 @@ void main()
 
 	if (density > 0.0){
 		float light_transmittance = marchLightRay(sample_pos);
-		light_energy += density * step_last * transmittance * light_transmittance;
+		float forward_scattering = pow(dot(ray_direction, normalize(light_direction)) * 0.5 + 0.5, forward_scattering_power);
+		light_energy += (density * transmittance * light_transmittance + forward_scattering * forward_scattering_multiplier) * step_last;
 		transmittance *= beersLaw(density * step_last, light_absorption);
 	}
 
