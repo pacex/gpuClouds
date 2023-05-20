@@ -71,10 +71,13 @@ const std::string envmap_base_name = "001";
 // TODO: change to directional light source
 
 vec3 lightDirection;
-vec3 light_color = vec3(1.f, 1.f, 1.f);
+vec3 lightColor = vec3(0.96f, 0.96f, 0.96f);
 
 float light_intensity_multiplier = 1.0f;
 
+
+vec3 skyColor = vec3(0.44f, 0.55f, 0.71f);
+vec3 horizonColor = vec3(0.83f, 0.86f, 0.87f);
 
 
 
@@ -119,8 +122,6 @@ float stepSize = 4.0f;
 float stepSizeSun = 8.0f;
 float cloudScale = 0.342f;
 float cloudSpeed = 0.118f;
-float forwardScatteringPower = 16.0f;
-float forwardScatteringMultiplier = 0.005f;
 
 void loadShaders(bool is_reload)
 {
@@ -239,6 +240,11 @@ void drawBackground(const mat4& viewMatrix, const mat4& projectionMatrix)
 	labhelper::setUniformSlow(backgroundProgram, "environment_multiplier", environment_multiplier);
 	labhelper::setUniformSlow(backgroundProgram, "inv_PV", inverse(projectionMatrix * viewMatrix));
 	labhelper::setUniformSlow(backgroundProgram, "camera_pos", cameraPosition);
+
+	labhelper::setUniformSlow(backgroundProgram, "light_direction", lightDirection);
+	labhelper::setUniformSlow(backgroundProgram, "color_sun", lightColor);
+	labhelper::setUniformSlow(backgroundProgram, "color_sky", skyColor);
+	labhelper::setUniformSlow(backgroundProgram, "color_horizon", horizonColor);
 	labhelper::drawFullScreenQuad();
 }
 
@@ -258,7 +264,7 @@ void drawScene(GLuint currentShaderProgram,
 	glUseProgram(currentShaderProgram);
 	// Light source
 	vec4 viewSpaceLightDirection = viewMatrix * vec4(lightDirection, 0.0f);
-	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", light_color);
+	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", lightColor);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_intensity_multiplier",
 	                          light_intensity_multiplier);
 	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDirection", vec3(viewSpaceLightDirection));
@@ -299,7 +305,7 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
 	labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
 	labhelper::setUniformSlow(shaderProgram, "light_direction", lightDirection);
-	labhelper::setUniformSlow(shaderProgram, "light_color", light_color);
+	labhelper::setUniformSlow(shaderProgram, "light_color", lightColor);
 	labhelper::setUniformSlow(shaderProgram, "density_threshold", densityThreshold);
 	labhelper::setUniformSlow(shaderProgram, "density_multiplier", densityMultiplier);
 	labhelper::setUniformSlow(shaderProgram, "light_absorption", lightAbsorption);
@@ -310,8 +316,6 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "step_size_sun", stepSizeSun);
 	labhelper::setUniformSlow(shaderProgram, "step_size", stepSize);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
-	labhelper::setUniformSlow(shaderProgram, "forward_scattering_power", forwardScatteringPower);
-	labhelper::setUniformSlow(shaderProgram, "forward_scattering_multiplier", forwardScatteringMultiplier);
 	labhelper::render(cloudContainer);
 }
 
@@ -357,7 +361,7 @@ void display(void)
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 	*/
 
-	lightDirection = normalize(vec3(1.0f, 1.0f, 1.0f));
+	lightDirection = normalize(vec3(1.0f, 0.15f, 1.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Bind the environment map(s) to unused texture units
@@ -526,27 +530,25 @@ void gui()
 	            ImGui::GetIO().Framerate);
 	// ----------------------------------------------------------
 
+	// Cloud Rendering
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Cloud Rendering:");
+
+	ImGui::SliderFloat("Density Threshold", &densityThreshold, 0.0, 1.0);
+	ImGui::SliderFloat("Density Multiplier", &densityMultiplier, 0.0, 2.0);
+	ImGui::SliderFloat("Step Size", &stepSize, 0.1, 32.0);
+	ImGui::SliderFloat("Step Size Sun", &stepSizeSun, 4.0, 64.0);
+	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
+	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.01, 2.0);
+	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
+	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
+	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
+
 	// Noise
 	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Noise Generation:");
 
 	ImGui::Checkbox("Enable Preview", &displayPreview);
 	ImGui::SliderFloat("Preview Z", &previewLayer, 0.0, 1.0);
 	ImGui::SliderInt("Preview Channel", &previewChannel, 0, 3);
-
-	// Cloud Rendering
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Cloud Rendering:");
-
-	ImGui::SliderFloat("Density Threshold", &densityThreshold, 0.0, 1.0);
-	ImGui::SliderFloat("Density Multiplier", &densityMultiplier, 0.0, 2.0);
-	ImGui::SliderFloat("Step Size", &stepSize, 4.0, 32.0);
-	ImGui::SliderFloat("Step Size Sun", &stepSizeSun, 0.1, 64.0);
-	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
-	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.01, 2.0);
-	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
-	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
-	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
-	ImGui::SliderFloat("Fwd. Sc. Pow.", &forwardScatteringPower, 0.0, 64.0);
-	ImGui::SliderFloat("Fwd. Sc. Mtp.", &forwardScatteringMultiplier, 0.0, 0.01);
 
 }
 
