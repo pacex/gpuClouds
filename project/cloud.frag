@@ -44,9 +44,9 @@ float sampleCloudDensity(vec3 pos){
 	vec3 offset = time * cloud_speed * normalize(vec3(1.0, 0.0, 2.0));
 	vec4 c = texture(shapeNoise, (pos * 0.01 + offset) * cloud_scale);
 
-	//return remap(max(c.r - density_threshold, 0.0), (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) * density_multiplier;
+	return max(0.0, remap(c.r, (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) - density_threshold) * density_multiplier;
 	// TODO: incorporate detail noise
-	return max(0.0, (0.5625 * c.r + 0.25 * c.g + 0.125 * c.b + 0.0625 * c.a) - density_threshold) * density_multiplier;
+	//return max(0.0, (0.5625 * c.r + 0.25 * c.g + 0.125 * c.b + 0.0625 * c.a) - density_threshold) * density_multiplier;
 }
 
 float marchLightRay(vec3 pos){

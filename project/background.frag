@@ -40,5 +40,5 @@ void main()
 
 	vec3 col_final = mix(col_sky_sun, vec3(0.23, 0.18, 0.11), pow(dot(dir, vec3(0.0, 1.0, 0.0)), 1.0) * 0.5 + 0.5);
 
-	fragmentColor = dot(dir, vec3(0.0, 1.0, 0.0)) > 0.0 ? vec4(col_sky_sun, 1.0) : vec4(0.23, 0.18, 0.11, 1.0);
+	fragmentColor = dot(dir, vec3(0.0, 1.0, 0.0)) > 0.0 ? vec4(col_sky_sun, 1.0) : vec4(vec3(0.23, 0.18, 0.11) * (1.0 - 0.5 * dot(dir, vec3(0.0, -1.0, 0.0))), 1.0);
 }

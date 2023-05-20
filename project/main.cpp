@@ -113,14 +113,14 @@ float previewLayer = 0.0;
 bool displayPreview = false;
 int previewChannel = 0;
 
-float densityThreshold = 0.49f;
-float densityMultiplier = 0.823f;
+float densityThreshold = 0.656f;
+float densityMultiplier = 0.952f;
 float lightAbsorption = 1.415f;
 float lightAbsorptionSun = 0.966f;
 float darknessThreshold = 0.367f;
 float stepSize = 4.0f;
-float stepSizeSun = 8.0f;
-float cloudScale = 0.342f;
+float stepSizeSun = 16.0f;
+float cloudScale = 0.22f;
 float cloudSpeed = 0.118f;
 
 void loadShaders(bool is_reload)
