@@ -5,6 +5,7 @@ precision highp float;
 
 uniform mat4 pv_inverse;
 uniform mat4 view_inverse;
+uniform mat4 view;
 uniform mat4 model_inverse;
 uniform mat4 model;
 
@@ -41,12 +42,22 @@ float remap(float value, float low1, float high1, float low2, float high2){
 }
 
 float sampleCloudDensity(vec3 pos){
+	
+	// Shape altering height function
+	vec3 model_pos = (model_inverse * vec4(pos, 1.0)).xyz;
+	float h = remap(model_pos.y, -1.0, 1.0, 0.0, 1.0);
+
+	float SA_bottom = clamp(h * remap(h, 0.0, 0.07, 0.0, 1.0), 0.0, 1.0);
+	float SA_top = clamp(remap(h, 0.3, 1.0, 1.0, 0.0), 0.0, 1.0);
+
+
+	// Sample density
 	vec3 offset = time * cloud_speed * normalize(vec3(1.0, 0.0, 2.0));
 	vec4 c = texture(shapeNoise, (pos * 0.01 + offset) * cloud_scale);
 
-	return max(0.0, remap(c.r, (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) - density_threshold) * density_multiplier;
-	// TODO: incorporate detail noise
-	//return max(0.0, (0.5625 * c.r + 0.25 * c.g + 0.125 * c.b + 0.0625 * c.a) - density_threshold) * density_multiplier;
+	// Combine shape and detail noise
+	float density = max(0.0, remap(c.r, (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) - density_threshold) * density_multiplier;
+	return density * SA_bottom * SA_top;
 }
 
 float marchLightRay(vec3 pos){
@@ -123,15 +134,21 @@ void main()
 	float light_energy = 0.0;
 
 	vec3 ray_direction = normalize(world_itsc_out - world_itsc_in);
-	float ray_max = length(world_itsc_out - world_itsc_in);
+
+	float ray_max = length(world_itsc_out - world_itsc_in); // Cut off ray when it hits geometry (i.e depth exceeds depth buffer)
 	ray_max = max(min(ray_max, dot(sampled_world - world_itsc_in, ray_direction)), 0.0);
 
-	int step_cnt = int(floor(ray_max / step_size));
-	float step_last = fract(ray_max / step_size) * step_size;
+	vec3 world_position = (model * vec4(model_position, 1.0)).xyz; // TODO: get min ray cutoff to work
+	float ray_min = max(0.0, dot(world_position - world_itsc_in, ray_direction));
+
+	float ray_len = max(0.0, ray_max - ray_min);
+
+	int step_cnt = int(floor(ray_len / step_size));
+	float step_last = fract(ray_len / step_size) * step_size;
 
 	int i = 0;
 	while(i < step_cnt){
-		vec3 sample_pos = world_itsc_in + ray_direction * step_size * i;
+		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i + ray_min);
 		float density = sampleCloudDensity(sample_pos);
 
 		if (density > 0.0){
@@ -139,12 +156,11 @@ void main()
 			light_energy += density * transmittance * light_transmittance * step_size;
 			transmittance *= beersLaw(density * step_size, light_absorption);
 		}
-
 		i++;
 	}
 
-	if (step_cnt > 0){ // Last step
-		vec3 sample_pos = world_itsc_in + ray_direction * step_size * step_cnt;
+	if (step_last > 0.0){ // Last step
+		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * step_cnt + ray_min);
 		float density = sampleCloudDensity(sample_pos);
 
 		if (density > 0.0){

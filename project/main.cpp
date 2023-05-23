@@ -55,6 +55,7 @@ unsigned int screenDepthTexture;
 GLuint shaderProgram;       // Shader for rendering geometry
 GLuint backgroundProgram;	// Shader for rendering environment map as background
 GLuint cloudProgram;		// Shader for rendering cloud container
+GLuint cloudInsideProgram;	// Shader for rendering clouds if camera is inside cloud container
 GLuint screenProgram;		// Shader for rendering screen buffer to screen
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -141,6 +142,12 @@ void loadShaders(bool is_reload)
 	if (shader != 0)
 	{
 		cloudProgram = shader;
+	}
+
+	shader = labhelper::loadShaderProgram("../project/cloudInside.vert", "../project/cloud.frag", is_reload);
+	if (shader != 0)
+	{
+		cloudInsideProgram = shader;
 	}
 
 	shader = labhelper::loadShaderProgram("../project/fullScreenQuad.vert", "../project/screen.frag", is_reload);
@@ -297,13 +304,38 @@ void drawScene(GLuint currentShaderProgram,
 	labhelper::render(fighterModel);
 }
 
-void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4& projectionMatrix) {
-	glUseProgram(shaderProgram);
+void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
+
+	GLuint shaderProgram;
+	mat4 modelInverse = inverse(cloudContainerModelMatrix);
+	vec3 camPosModel = vec3(modelInverse * vec4(cameraPosition, 1.0));
+
+	bool cameraInVolume = camPosModel.x >= -1.0f && camPosModel.x <= 1.0f &&
+							camPosModel.y >= -1.0f && camPosModel.y <= 1.0f &&
+							camPosModel.z >= -1.0f && camPosModel.z <= 1.0f;
+
+	cameraInVolume = false; // TODO: remove this once min ray cutoff works
+
+	if (cameraInVolume) {
+		// Camera inside cloud volume
+		shaderProgram = cloudInsideProgram;
+		glUseProgram(shaderProgram);
+		labhelper::setUniformSlow(shaderProgram, "inv_PVM", inverse(projectionMatrix * viewMatrix * cloudContainerModelMatrix));
+	}
+	else {
+		// Camera outside cloud volume
+		shaderProgram = cloudProgram;
+		glUseProgram(shaderProgram);
+		labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
+	}
+
+	
 	labhelper::setUniformSlow(shaderProgram, "pv_inverse", inverse(projectionMatrix * viewMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view_inverse", inverse(viewMatrix));
+	labhelper::setUniformSlow(shaderProgram, "view", viewMatrix);
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
-	labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
+	
 	labhelper::setUniformSlow(shaderProgram, "light_direction", lightDirection);
 	labhelper::setUniformSlow(shaderProgram, "light_color", lightColor);
 	labhelper::setUniformSlow(shaderProgram, "density_threshold", densityThreshold);
@@ -316,7 +348,10 @@ void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4
 	labhelper::setUniformSlow(shaderProgram, "step_size_sun", stepSizeSun);
 	labhelper::setUniformSlow(shaderProgram, "step_size", stepSize);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
-	labhelper::render(cloudContainer);
+
+	if (cameraInVolume) labhelper::drawFullScreenQuad();
+	else labhelper::render(cloudContainer);
+	
 }
 
 
@@ -407,7 +442,7 @@ void display(void)
 
 	drawScreenBuffer();
 	cloudContainerModelMatrix = translate(96.0f * worldUp + vec3(cameraPosition.x, 0.0f, cameraPosition.z)) * scale(vec3(512.0f, 16.0f, 512.0f));
-	drawCloudContainer(cloudProgram, viewMatrix, projMatrix);
+	drawCloudContainer(viewMatrix, projMatrix);
 
 	if (displayPreview) {
 		noiseGen->debugDraw(previewLayer, (float)windowWidth / (float)windowHeight, previewChannel);
