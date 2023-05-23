@@ -115,10 +115,10 @@ bool displayPreview = false;
 int previewChannel = 0;
 
 float densityThreshold = 0.656f;
-float densityMultiplier = 0.952f;
-float lightAbsorption = 1.415f;
-float lightAbsorptionSun = 0.966f;
-float darknessThreshold = 0.367f;
+float densityMultiplier = 1.0f;
+float lightAbsorption = 1.6f;
+float lightAbsorptionSun = 0.666f;
+float darknessThreshold = 0.267f;
 float stepSize = 4.0f;
 float stepSizeSun = 16.0f;
 float cloudScale = 0.22f;
