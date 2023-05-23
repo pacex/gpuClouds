@@ -299,7 +299,7 @@ void drawScene(GLuint currentShaderProgram,
 
 void drawCloudContainer(GLuint shaderProgram, const mat4& viewMatrix, const mat4& projectionMatrix) {
 	glUseProgram(shaderProgram);
-	labhelper::setUniformSlow(shaderProgram, "proj_inverse", inverse(projectionMatrix));
+	labhelper::setUniformSlow(shaderProgram, "pv_inverse", inverse(projectionMatrix * viewMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view_inverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
@@ -406,7 +406,7 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawScreenBuffer();
-	cloudContainerModelMatrix = translate(48.0f * worldUp + vec3(cameraPosition.x, cameraPosition.y, 0.0f)) * scale(vec3(512.0f, 16.0f, 512.0f));
+	cloudContainerModelMatrix = translate(96.0f * worldUp + vec3(cameraPosition.x, 0.0f, cameraPosition.z)) * scale(vec3(512.0f, 16.0f, 512.0f));
 	drawCloudContainer(cloudProgram, viewMatrix, projMatrix);
 
 	if (displayPreview) {

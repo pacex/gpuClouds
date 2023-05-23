@@ -3,7 +3,7 @@
 // required by GLSL spec Sect 4.5.3 (though nvidia does not, amd does)
 precision highp float;
 
-uniform mat4 proj_inverse;
+uniform mat4 pv_inverse;
 uniform mat4 view_inverse;
 uniform mat4 model_inverse;
 uniform mat4 model;
@@ -98,7 +98,8 @@ void main()
 	float sampled_depth = texture(screen_depth, screen_position).r;
 
 	vec4 sampled_ndc = vec4(ndc.xy, sampled_depth, 1.0);
-	vec3 sampled_world = (view_inverse * proj_inverse * sampled_ndc).xyz;
+	vec4 sampled_world_4 = (pv_inverse * sampled_ndc);
+	vec3 sampled_world = sampled_world_4.xyz / sampled_world_4.w;
 
 	// Get view ray intersections with cloud container
 	vec3 model_campos = (model_inverse * view_inverse * vec4(vec3(0.0), 1.0)).xyz;		// Perform itsc check in model space to allow for rotation in world space
@@ -123,7 +124,7 @@ void main()
 
 	vec3 ray_direction = normalize(world_itsc_out - world_itsc_in);
 	float ray_max = length(world_itsc_out - world_itsc_in);
-	//ray_max = min(ray_max, dot(sampled_world - world_itsc_in, ray_direction));
+	ray_max = max(min(ray_max, dot(sampled_world - world_itsc_in, ray_direction)), 0.0);
 
 	int step_cnt = int(floor(ray_max / step_size));
 	float step_last = fract(ray_max / step_size) * step_size;
@@ -142,17 +143,17 @@ void main()
 		i++;
 	}
 
-		// Last step
-	vec3 sample_pos = world_itsc_in + ray_direction * step_size * step_cnt;
-	float density = sampleCloudDensity(sample_pos);
+	if (step_cnt > 0){ // Last step
+		vec3 sample_pos = world_itsc_in + ray_direction * step_size * step_cnt;
+		float density = sampleCloudDensity(sample_pos);
 
-	if (density > 0.0){
-		float light_transmittance = marchLightRay(sample_pos);
-		light_energy += density * transmittance * light_transmittance * step_last;
-		transmittance *= beersLaw(density * step_last, light_absorption);
+		if (density > 0.0){
+			float light_transmittance = marchLightRay(sample_pos);
+			light_energy += density * transmittance * light_transmittance * step_last;
+			transmittance *= beersLaw(density * step_last, light_absorption);
+		}
 	}
-
-
+		
 	// Shading
 
 	// Output color
