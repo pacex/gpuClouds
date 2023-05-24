@@ -72,7 +72,7 @@ const std::string envmap_base_name = "001";
 // TODO: change to directional light source
 
 vec3 lightDirection;
-vec3 lightColor = vec3(0.96f, 0.96f, 0.96f);
+vec3 lightColor = vec3(0.984f, 0.871f, 0.698f);
 
 float light_intensity_multiplier = 1.0f;
 
@@ -123,6 +123,7 @@ float stepSize = 4.0f;
 float stepSizeSun = 16.0f;
 float cloudScale = 0.22f;
 float cloudSpeed = 0.118f;
+float forwardScattering = 0.738f;
 
 void loadShaders(bool is_reload)
 {
@@ -348,6 +349,7 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 	labhelper::setUniformSlow(shaderProgram, "step_size_sun", stepSizeSun);
 	labhelper::setUniformSlow(shaderProgram, "step_size", stepSize);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
+	labhelper::setUniformSlow(shaderProgram, "forward_scattering", forwardScattering);
 
 	if (cameraInVolume) labhelper::drawFullScreenQuad();
 	else labhelper::render(cloudContainer);
@@ -441,7 +443,7 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawScreenBuffer();
-	cloudContainerModelMatrix = translate(96.0f * worldUp + vec3(cameraPosition.x, 0.0f, cameraPosition.z)) * scale(vec3(512.0f, 16.0f, 512.0f));
+	cloudContainerModelMatrix = translate(96.0f * worldUp) * scale(vec3(512.0f, 16.0f, 512.0f));
 	drawCloudContainer(viewMatrix, projMatrix);
 
 	if (displayPreview) {
@@ -577,6 +579,7 @@ void gui()
 	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
 	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
 	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
+	ImGui::SliderFloat("Forward-Scattering", &forwardScattering, 0.0, 1.0);
 
 	// Noise
 	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Noise Generation:");

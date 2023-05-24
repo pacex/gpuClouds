@@ -18,11 +18,14 @@ uniform float step_size_sun;
 uniform float step_size;
 uniform float cloud_scale;
 uniform float cloud_speed;
+uniform float forward_scattering;
 
 uniform vec3 light_direction;
 uniform vec3 light_color;
 
 uniform float time;
+
+const float M_PI = 3.14159265358979;
 
 in vec4 clip_position;
 in vec3 model_position;
@@ -35,6 +38,11 @@ layout(location = 0) out vec4 fragmentColor;
 
 float beersLaw(float x, float d){
 	return exp(-x * d);
+}
+
+float henyey_greenstein(float cos_angle, float g){
+	float g2 = g * g;
+	return (1.0 - g2) / (4.0 * M_PI * pow(1.0 + g2 - 2.0 * g * cos_angle, 1.5));
 }
 
 float remap(float value, float low1, float high1, float low2, float high2){
@@ -134,51 +142,41 @@ void main()
 	float light_energy = 0.0;
 
 	vec3 ray_direction = normalize(world_itsc_out - world_itsc_in);
+	float cos_angle = dot(ray_direction, light_direction);
 
 	float ray_max = length(world_itsc_out - world_itsc_in); // Cut off ray when it hits geometry (i.e depth exceeds depth buffer)
 	ray_max = max(min(ray_max, dot(sampled_world - world_itsc_in, ray_direction)), 0.0);
 
 	vec3 world_position = (model * vec4(model_position, 1.0)).xyz; // TODO: get min ray cutoff to work
-	float ray_min = max(0.0, dot(world_position - world_itsc_in, ray_direction));
+	//float ray_min = max(0.0, dot(world_position - world_itsc_in, ray_direction));
 
-	float ray_len = max(0.0, ray_max - ray_min);
+	//float ray_len = max(0.0, ray_max - ray_min);
 
-	int step_cnt = int(floor(ray_len / step_size));
-	float step_last = fract(ray_len / step_size) * step_size;
+	int step_cnt = int(floor(ray_max / step_size));
+	float step_last = fract(ray_max / step_size) * step_size;
 
 	int i = 0;
-	while(i < step_cnt){
-		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i + ray_min);
+	while(i <= step_cnt){
+		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i);
 		float density = sampleCloudDensity(sample_pos);
 
+		float weight = i < step_cnt ? step_size : step_last;
+
 		if (density > 0.0){
-			float light_transmittance = marchLightRay(sample_pos);
-			light_energy += density * transmittance * light_transmittance * step_size;
-			transmittance *= beersLaw(density * step_size, light_absorption);
+			// Amount of light sampled point receives from the sun
+			float light_transmittance = marchLightRay(sample_pos) * max(henyey_greenstein(cos_angle, forward_scattering), 1.0);
+			light_energy += density * transmittance * light_transmittance * weight;
+
+			// Amount of light reaching camera from this point
+			transmittance *= beersLaw(density * weight, light_absorption);
 		}
 		i++;
 	}
 
-	if (step_last > 0.0){ // Last step
-		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * step_cnt + ray_min);
-		float density = sampleCloudDensity(sample_pos);
-
-		if (density > 0.0){
-			float light_transmittance = marchLightRay(sample_pos);
-			light_energy += density * transmittance * light_transmittance * step_last;
-			transmittance *= beersLaw(density * step_last, light_absorption);
-		}
-	}
-		
-	// Shading
-
-	// Output color
-	//fragmentColor = vec4(vec3(mtp), 1.0);
+	// Blend between screen- and cloud color
 	vec3 screen_rgb = texture(screen_color, screen_position).rgb;
 	vec3 cloud_rgb = light_color * light_energy;
 
-
 	fragmentColor = vec4(screen_rgb * transmittance + cloud_rgb, 1.0);
-	//fragmentColor = vec4(light_color, 1.0);
 	
 }
