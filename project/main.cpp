@@ -121,8 +121,8 @@ float lightAbsorptionSun = 0.666f;
 float darknessThreshold = 0.267f;
 float stepSize = 4.0f;
 float stepSizeSun = 16.0f;
-float cloudScale = 0.22f;
-float cloudSpeed = 0.118f;
+float cloudScale = 0.0022f;
+float cloudSpeed = 10.0f;
 float forwardScattering = 0.738f;
 
 void loadShaders(bool is_reload)
@@ -208,13 +208,13 @@ void initialize()
 	// Load models and set up model matrices
 	///////////////////////////////////////////////////////////////////////
 	fighterModel = labhelper::loadModelFromOBJ("../scenes/space-ship.obj");
-	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
+	landingpadModel = labhelper::loadModelFromOBJ("../scenes/city.obj");
 	cloudContainer = labhelper::loadModelFromOBJ("../scenes/cube.obj");
 
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
-	landingPadModelMatrix = mat4(1.0f);
-	cloudContainerModelMatrix = translate(48.0f * worldUp) * scale(vec3(64.0f, 16.0f, 64.0f));
+	landingPadModelMatrix = scale(vec3(2.6f));
+	cloudContainerModelMatrix = translate(96.0f * worldUp) * scale(vec3(512.0f, 16.0f, 512.0f));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -317,6 +317,8 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 
 	cameraInVolume = false; // TODO: remove this once min ray cutoff works
 
+
+	// Vertex shader uniforms
 	if (cameraInVolume) {
 		// Camera inside cloud volume
 		shaderProgram = cloudInsideProgram;
@@ -330,8 +332,9 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 		labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
 	}
 
-	
-	labhelper::setUniformSlow(shaderProgram, "pv_inverse", inverse(projectionMatrix * viewMatrix));
+	// Fragment shader uniforms
+	labhelper::setUniformSlow(shaderProgram, "pv", projectionMatrix * viewMatrix);
+	labhelper::setUniformSlow(shaderProgram, "proj_inverse", inverse(projectionMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view_inverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view", viewMatrix);
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
@@ -388,7 +391,7 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 1024.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	/*
@@ -443,7 +446,7 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawScreenBuffer();
-	cloudContainerModelMatrix = translate(96.0f * worldUp) * scale(vec3(512.0f, 16.0f, 512.0f));
+	
 	drawCloudContainer(viewMatrix, projMatrix);
 
 	if (displayPreview) {
@@ -575,7 +578,7 @@ void gui()
 	ImGui::SliderFloat("Step Size", &stepSize, 0.1, 32.0);
 	ImGui::SliderFloat("Step Size Sun", &stepSizeSun, 4.0, 64.0);
 	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
-	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.01, 2.0);
+	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.0, 80.0);
 	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
 	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
 	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);

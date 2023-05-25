@@ -3,7 +3,8 @@
 // required by GLSL spec Sect 4.5.3 (though nvidia does not, amd does)
 precision highp float;
 
-uniform mat4 pv_inverse;
+uniform mat4 proj_inverse;
+uniform mat4 pv;
 uniform mat4 view_inverse;
 uniform mat4 view;
 uniform mat4 model_inverse;
@@ -49,6 +50,11 @@ float remap(float value, float low1, float high1, float low2, float high2){
 	return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
 }
 
+float getWorldPosDepth(vec3 pos){
+	vec4 clipPos = pv * vec4(pos, 1.0);
+	return (clipPos.xyz / clipPos.w).z;
+}
+
 float sampleCloudDensity(vec3 pos){
 	
 	// Shape altering height function
@@ -61,7 +67,7 @@ float sampleCloudDensity(vec3 pos){
 
 	// Sample density
 	vec3 offset = time * cloud_speed * normalize(vec3(1.0, 0.0, 2.0));
-	vec4 c = texture(shapeNoise, (pos * 0.01 + offset) * cloud_scale);
+	vec4 c = texture(shapeNoise, (pos + offset) * cloud_scale);
 
 	// Combine shape and detail noise
 	float density = max(0.0, remap(c.r, (0.625 * c.g + 0.25 * c.b + 0.125 * c.a) - 1.0, 1.0, 0.0, 1.0) - density_threshold) * density_multiplier;
@@ -114,10 +120,12 @@ void main()
 	vec2 screen_position = ndc.xy * 0.5 + 0.5;
 
 	vec4 sampled_color = texture(screen_color, screen_position);
-	float sampled_depth = texture(screen_depth, screen_position).r;
+	float sampled_depth = texture(screen_depth, screen_position).r * 2.0 - 1.0;
+
+	if (sampled_depth <= ndc.z) discard;
 
 	vec4 sampled_ndc = vec4(ndc.xy, sampled_depth, 1.0);
-	vec4 sampled_world_4 = (pv_inverse * sampled_ndc);
+	vec4 sampled_world_4 = (view_inverse * proj_inverse * sampled_ndc);
 	vec3 sampled_world = sampled_world_4.xyz / sampled_world_4.w;
 
 	// Get view ray intersections with cloud container
@@ -156,6 +164,7 @@ void main()
 	float step_last = fract(ray_max / step_size) * step_size;
 
 	int i = 0;
+	
 	while(i <= step_cnt){
 		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i);
 		float density = sampleCloudDensity(sample_pos);
@@ -173,10 +182,10 @@ void main()
 		i++;
 	}
 
+
 	// Blend between screen- and cloud color
 	vec3 screen_rgb = texture(screen_color, screen_position).rgb;
 	vec3 cloud_rgb = light_color * light_energy;
 
 	fragmentColor = vec4(screen_rgb * transmittance + cloud_rgb, 1.0);
-	
 }
