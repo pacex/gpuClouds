@@ -102,9 +102,10 @@ float marchLightRay(vec3 pos){
 	int step_mtp = 1;
 	while(i <= step_cnt){
 		vec3 sample_pos = pos + ray_direction * step_size_sun * i;
-		float density = sampleCloudDensity(sample_pos) * step_size;
 		float weight = i < step_cnt ? step_size_sun * float(step_mtp) : step_last + step_size_sun * float(step_mtp - 1);
 
+		float density = sampleCloudDensity(sample_pos);
+		
 		transmittance *= beersLaw(density * weight, light_absorption_sun);
 
 		if (transmittance <= 0.0) break;
