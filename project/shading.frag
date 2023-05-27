@@ -23,7 +23,10 @@ layout(binding = 5) uniform sampler2D emissiveMap;
 layout(binding = 6) uniform sampler2D environmentMap;
 layout(binding = 7) uniform sampler2D irradianceMap;
 layout(binding = 8) uniform sampler2D reflectionMap;
+layout(binding = 12) uniform sampler2D shadowMap;
 uniform float environment_multiplier;
+
+uniform mat4 light_pv;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
@@ -120,6 +123,19 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n, vec3 base_color)
 void main()
 {
 	float visibility = 1.0;
+
+	// Shadows
+	vec4 worldPosition = viewInverse * vec4(viewSpacePosition, 1.0);
+	vec4 lightNdcPosition = light_pv * worldPosition;
+	lightNdcPosition = lightNdcPosition / lightNdcPosition.w;
+	vec2 screenPos = lightNdcPosition.xy * 0.5 + 0.5;
+	//screenPos.y = 1.0 + screenPos.y;
+
+	float occluderDepth = texture(shadowMap, screenPos).r;
+	float ownDepth = lightNdcPosition.z * 0.5 + 0.5;
+
+	visibility = (ownDepth <= occluderDepth) ? 1.0 : 0.0;
+
 	float attenuation = 1.0;
 
 	vec3 wo = -normalize(viewSpacePosition);
@@ -149,5 +165,7 @@ void main()
 	vec3 shading = direct_illumination_term + indirect_illumination_term + emission_term;
 
 	fragmentColor = vec4(shading, 1.0);
+	//fragmentColor = vec4(vec3(occluderDepth), 1.0);
+	//fragmentColor = vec4(screenPos.r, 0.0, 0.0, 1.0);
 	return;
 }

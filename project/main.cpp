@@ -49,10 +49,16 @@ unsigned int screenbuffer;
 unsigned int screenColorTexture;
 unsigned int screenDepthTexture;
 
+// Shadow map buffer
+unsigned int shadowMapBuffer;
+unsigned int shadowMapDepthTexture;
+int shadowMapSize = 1024;
+
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
 GLuint shaderProgram;       // Shader for rendering geometry
+GLuint simpleProgram;
 GLuint backgroundProgram;	// Shader for rendering environment map as background
 GLuint cloudProgram;		// Shader for rendering cloud container
 GLuint cloudInsideProgram;	// Shader for rendering clouds if camera is inside cloud container
@@ -104,6 +110,9 @@ mat4 landingPadModelMatrix;
 mat4 fighterModelMatrix;
 mat4 cloudContainerModelMatrix;
 
+mat4 lightViewMatrix;
+mat4 lightProjMatrix;
+
 float shipSpeed = 50;
 
 ///////////////////////////////////////////////////////////////////////
@@ -131,6 +140,12 @@ void loadShaders(bool is_reload)
 	if(shader != 0)
 	{
 		backgroundProgram = shader;
+	}
+
+	shader = labhelper::loadShaderProgram("../project/simple.vert", "../project/simple.frag", is_reload);
+	if (shader != 0)
+	{
+		simpleProgram = shader;
 	}
 
 	shader = labhelper::loadShaderProgram("../project/shading.vert", "../project/shading.frag", is_reload);
@@ -205,6 +220,24 @@ void initialize()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	///////////////////////////////////////////////////////////////////////
+	//		Shadow Map
+	///////////////////////////////////////////////////////////////////////
+
+	glGenTextures(1, &shadowMapDepthTexture);
+	glBindTexture(GL_TEXTURE_2D, shadowMapDepthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowMapSize, shadowMapSize, 0, GL_DEPTH_COMPONENT , GL_UNSIGNED_BYTE, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glGenFramebuffers(1, &shadowMapBuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapBuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMapDepthTexture, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
 	///////////////////////////////////////////////////////////////////////
 	fighterModel = labhelper::loadModelFromOBJ("../scenes/space-ship.obj");
@@ -215,6 +248,12 @@ void initialize()
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = scale(vec3(2.6f));
 	cloudContainerModelMatrix = translate(96.0f * worldUp) * scale(vec3(512.0f, 16.0f, 512.0f));
+
+	lightDirection = normalize(vec3(1.0f, 0.15f, 1.0f));
+
+	lightViewMatrix = lookAt(lightDirection, vec3(0.0f), worldUp);
+	float smHalf = (float)shadowMapSize * 0.5f;
+	lightProjMatrix = ortho(-smHalf, smHalf, -smHalf * 0.4f, smHalf * 0.4f, -1024.0f, 1024.0f);
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -278,6 +317,7 @@ void drawScene(GLuint currentShaderProgram,
 	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDirection", vec3(viewSpaceLightDirection));
 	//labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDir",
 	                          //normalize(vec3(viewMatrix * vec4(-lightDirection, 0.0f))));
+	labhelper::setUniformSlow(currentShaderProgram, "light_pv", lightProjMatrix * lightViewMatrix);
 
 
 	// Environment
@@ -302,6 +342,23 @@ void drawScene(GLuint currentShaderProgram,
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix",
 	                          inverse(transpose(viewMatrix * fighterModelMatrix)));
 
+	labhelper::render(fighterModel);
+}
+
+void drawSceneToShadowMap()
+{
+	glUseProgram(simpleProgram);
+	
+
+	// Landing Pad
+	labhelper::setUniformSlow(simpleProgram, "modelViewProjectionMatrix",
+		lightProjMatrix * lightViewMatrix * landingPadModelMatrix);
+	labhelper::render(landingpadModel);
+
+	// Fighter
+	labhelper::setUniformSlow(simpleProgram, "modelViewProjectionMatrix",
+		lightProjMatrix * lightViewMatrix * fighterModelMatrix);
+	
 	labhelper::render(fighterModel);
 }
 
@@ -339,6 +396,7 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 	labhelper::setUniformSlow(shaderProgram, "view", viewMatrix);
 	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
 	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
+	labhelper::setUniformSlow(shaderProgram, "light_pv", lightProjMatrix * lightViewMatrix);
 	
 	labhelper::setUniformSlow(shaderProgram, "light_direction", lightDirection);
 	labhelper::setUniformSlow(shaderProgram, "light_color", lightColor);
@@ -391,7 +449,7 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 1024.0f);
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 4096.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	/*
@@ -400,8 +458,6 @@ void display(void)
 	mat4 lightViewMatrix = lookAt(lightDirection, vec3(0.0f), worldUp);
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 	*/
-
-	lightDirection = normalize(vec3(1.0f, 0.15f, 1.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Bind the environment map(s) to unused texture units
@@ -414,11 +470,29 @@ void display(void)
 	glBindTexture(GL_TEXTURE_2D, reflectionMap);
 	glActiveTexture(GL_TEXTURE0);
 
+	///////////////////////////////////////////////////////////////////////////
+	// Draw shadow map
+	///////////////////////////////////////////////////////////////////////////
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapBuffer);
+
+	glViewport(0, 0, windowWidth, windowHeight);
+	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	drawSceneToShadowMap();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw scene to screen buffer
 	///////////////////////////////////////////////////////////////////////////
 	glBindFramebuffer(GL_FRAMEBUFFER, screenbuffer);
+
+	glActiveTexture(GL_TEXTURE12);
+	glBindTexture(GL_TEXTURE_2D, shadowMapDepthTexture);
+	glActiveTexture(GL_TEXTURE0);
 
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
@@ -577,7 +651,7 @@ void gui()
 	ImGui::SliderFloat("Density Multiplier", &densityMultiplier, 0.0, 2.0);
 	ImGui::SliderFloat("Step Size", &stepSize, 0.1, 32.0);
 	ImGui::SliderFloat("Step Size Sun", &stepSizeSun, 4.0, 64.0);
-	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
+	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.0001, 0.02);
 	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.0, 80.0);
 	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);
 	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);

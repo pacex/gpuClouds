@@ -9,6 +9,7 @@ uniform mat4 view_inverse;
 uniform mat4 view;
 uniform mat4 model_inverse;
 uniform mat4 model;
+uniform mat4 light_pv;
 
 uniform float density_threshold;
 uniform float density_multiplier;
@@ -34,6 +35,7 @@ in vec3 model_position;
 layout(binding = 9) uniform sampler3D shapeNoise;
 layout(binding = 10) uniform sampler2D screen_color;
 layout(binding = 11) uniform sampler2D screen_depth;
+layout(binding = 12) uniform sampler2D shadow_map;
 
 layout(location = 0) out vec4 fragmentColor;
 
@@ -171,9 +173,19 @@ void main()
 
 		float weight = i < step_cnt ? step_size : step_last;
 
+		vec4 lightNdcPosition = light_pv * vec4(sample_pos, 1.0);
+		lightNdcPosition = lightNdcPosition / lightNdcPosition.w;
+		vec2 screenPos = lightNdcPosition.xy * 0.5 + 0.5;
+		//screenPos.y = 1.0 + screenPos.y;
+
+		float occluderDepth = texture(shadow_map, screenPos).r;
+		float ownDepth = lightNdcPosition.z * 0.5 + 0.5;
+
+		bool visible = (ownDepth <= occluderDepth);
+
 		if (density > 0.0){
 			// Amount of light sampled point receives from the sun
-			float light_transmittance = marchLightRay(sample_pos) * max(henyey_greenstein(cos_angle, forward_scattering), 1.0);
+			float light_transmittance = visible ? marchLightRay(sample_pos) * max(henyey_greenstein(cos_angle, forward_scattering), 1.0) : 0.0;
 			light_energy += density * transmittance * light_transmittance * weight;
 
 			// Amount of light reaching camera from this point
@@ -182,6 +194,14 @@ void main()
 		i++;
 	}
 
+
+	vec4 lightNdcPosition = light_pv * vec4(world_itsc_in, 1.0);
+		lightNdcPosition = lightNdcPosition / lightNdcPosition.w;
+		vec2 screenPos = lightNdcPosition.xy * 0.5 + 0.5;
+		//screenPos.y = 1.0 + screenPos.y;
+
+		float occluderDepth = texture(shadow_map, screenPos).r;
+		float ownDepth = lightNdcPosition.z * 0.5 + 0.5;
 
 	// Blend between screen- and cloud color
 	vec3 screen_rgb = texture(screen_color, screen_position).rgb;
