@@ -22,6 +22,7 @@ uniform float step_size_incr_sun;
 uniform float cloud_scale;
 uniform float cloud_speed;
 uniform float forward_scattering;
+uniform float blue_noise_offset_factor;
 
 uniform vec3 light_direction;
 uniform vec3 light_color;
@@ -36,6 +37,7 @@ in vec3 model_position;
 layout(binding = 9) uniform sampler3D shapeNoise;
 layout(binding = 10) uniform sampler2D screen_color;
 layout(binding = 11) uniform sampler2D screen_depth;
+layout(binding = 13) uniform sampler2D sample_offset_texture; // Blue noise texture
 
 layout(location = 0) out vec4 fragmentColor;
 
@@ -172,7 +174,18 @@ void main()
 	
 	while(i <= step_cnt){
 		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i);
-		float density = sampleCloudDensity(sample_pos);
+
+		vec4 sample_ndc_pos = pv * vec4(sample_pos, 1.0);
+		sample_ndc_pos /= sample_ndc_pos.w;
+		vec2 sample_screen_pos = sample_ndc_pos.xy * 0.5 + 0.5;
+
+		vec3 sample_offset = vec3(0.0);
+		if (blue_noise_offset_factor > 0.0){
+			sample_offset = (texture(sample_offset_texture, sample_screen_pos).rgb * 2.0 - 1.0) * blue_noise_offset_factor;
+		}
+
+
+		float density = sampleCloudDensity(sample_pos + sample_offset);
 
 		float weight = i < step_cnt ? step_size * float(step_mtp) : step_last + step_size * float(step_mtp - 1);
 

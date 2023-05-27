@@ -110,6 +110,7 @@ float shipSpeed = 50;
 // Cloud Rendering
 ///////////////////////////////////////////////////////////////////////
 NoiseGenerator* noiseGen = nullptr;
+GLuint blueNoiseTexture;
 float previewLayer = 0.0;
 bool displayPreview = false;
 int previewChannel = 0;
@@ -126,6 +127,7 @@ float stepSizeIncrSun = 0.0;
 float cloudScale = 0.0022f;
 float cloudSpeed = 10.0f;
 float forwardScattering = 0.738f;
+float blueNoiseOffsetFactor = 0.0f;
 
 void loadShaders(bool is_reload)
 {
@@ -240,6 +242,8 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////
 	noiseGen = new NoiseGenerator();
 	noiseGen->renderNoise();
+
+	blueNoiseTexture = labhelper::loadHdrTexture("../scenes/blueNoise.png");
 
 
 }
@@ -357,6 +361,7 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 	labhelper::setUniformSlow(shaderProgram, "step_size_incr_sun", stepSizeIncrSun);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
 	labhelper::setUniformSlow(shaderProgram, "forward_scattering", forwardScattering);
+	labhelper::setUniformSlow(shaderProgram, "blue_noise_offset_factor", blueNoiseOffsetFactor);
 
 	if (cameraInVolume) labhelper::drawFullScreenQuad();
 	else labhelper::render(cloudContainer);
@@ -443,6 +448,8 @@ void display(void)
 	glBindTexture(GL_TEXTURE_2D, screenColorTexture);
 	glActiveTexture(GL_TEXTURE11);
 	glBindTexture(GL_TEXTURE_2D, screenDepthTexture);
+	glActiveTexture(GL_TEXTURE13);
+	glBindTexture(GL_TEXTURE_2D, blueNoiseTexture);
 	glActiveTexture(GL_TEXTURE0);
 
 	glViewport(0, 0, windowWidth, windowHeight);
@@ -589,6 +596,7 @@ void gui()
 	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
 	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
 	ImGui::SliderFloat("Forward-Scattering", &forwardScattering, 0.0, 1.0);
+	ImGui::SliderFloat("Offset Factor", &blueNoiseOffsetFactor, 0.0, 5.0);
 
 	// Noise
 	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Noise Generation:");
