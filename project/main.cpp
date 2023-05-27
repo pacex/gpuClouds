@@ -121,6 +121,8 @@ float lightAbsorptionSun = 0.666f;
 float darknessThreshold = 0.267f;
 float stepSize = 4.0f;
 float stepSizeSun = 16.0f;
+float stepSizeIncr = 0.0;
+float stepSizeIncrSun = 0.0;
 float cloudScale = 0.0022f;
 float cloudSpeed = 10.0f;
 float forwardScattering = 0.738f;
@@ -351,6 +353,8 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 	labhelper::setUniformSlow(shaderProgram, "cloud_speed", cloudSpeed);
 	labhelper::setUniformSlow(shaderProgram, "step_size_sun", stepSizeSun);
 	labhelper::setUniformSlow(shaderProgram, "step_size", stepSize);
+	labhelper::setUniformSlow(shaderProgram, "step_size_incr", stepSizeIncr);
+	labhelper::setUniformSlow(shaderProgram, "step_size_incr_sun", stepSizeIncrSun);
 	labhelper::setUniformSlow(shaderProgram, "time", currentTime);
 	labhelper::setUniformSlow(shaderProgram, "forward_scattering", forwardScattering);
 
@@ -576,7 +580,9 @@ void gui()
 	ImGui::SliderFloat("Density Threshold", &densityThreshold, 0.0, 1.0);
 	ImGui::SliderFloat("Density Multiplier", &densityMultiplier, 0.0, 2.0);
 	ImGui::SliderFloat("Step Size", &stepSize, 0.1, 32.0);
+	ImGui::SliderFloat("Step Size Incr", &stepSizeIncr, 0.0, 1.0);
 	ImGui::SliderFloat("Step Size Sun", &stepSizeSun, 4.0, 64.0);
+	ImGui::SliderFloat("Step Size Incr Sun", &stepSizeIncrSun, 0.0, 1.0);
 	ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.01, 2.0);
 	ImGui::SliderFloat("Cloud Speed", &cloudSpeed, 0.0, 80.0);
 	ImGui::SliderFloat("Light Absorption", &lightAbsorption, 0.0, 2.0);

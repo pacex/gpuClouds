@@ -17,6 +17,8 @@ uniform float light_absorption_sun;
 uniform float darkness_threshold;
 uniform float step_size_sun;
 uniform float step_size;
+uniform float step_size_incr;
+uniform float step_size_incr_sun;
 uniform float cloud_scale;
 uniform float cloud_speed;
 uniform float forward_scattering;
@@ -88,7 +90,7 @@ float marchLightRay(vec3 pos){
 	vec3 world_itsc_out = (model * vec4(model_origin + model_dir * t_max, 1.0)).xyz;
 
 	// Ray marching
-	float density = 0.0;
+	float transmittance = 1.0;
 
 	vec3 ray_direction = normalize(world_itsc_out - pos);
 	float ray_max = length(world_itsc_out - pos);
@@ -97,18 +99,19 @@ float marchLightRay(vec3 pos){
 	float step_last = fract(ray_max / step_size_sun) * step_size_sun;
 
 	int i = 0;
-	while(i < step_cnt){
+	int step_mtp = 1;
+	while(i <= step_cnt){
 		vec3 sample_pos = pos + ray_direction * step_size_sun * i;
-		density += sampleCloudDensity(sample_pos) * step_size;
-		i++;
+		float density = sampleCloudDensity(sample_pos) * step_size;
+		float weight = i < step_cnt ? step_size_sun * float(step_mtp) : step_last + step_size_sun * float(step_mtp - 1);
+
+		transmittance *= beersLaw(density * weight, light_absorption_sun);
+
+		if (transmittance <= 0.0) break;
+		step_mtp = min(int(floor(1.0 / pow(transmittance, step_size_incr_sun))), max(step_cnt - i, 1));
+
+		i += step_mtp;
 	}
-
-		// Last step
-	vec3 sample_pos = pos + ray_direction * step_size_sun * step_cnt;
-	density += sampleCloudDensity(sample_pos) * step_last;
-
-	// Compute transmittance
-	float transmittance = beersLaw(density, light_absorption_sun);
 
 	return darkness_threshold + transmittance * (1.0 - darkness_threshold);
 }
@@ -162,6 +165,7 @@ void main()
 
 	int step_cnt = int(floor(ray_max / step_size));
 	float step_last = fract(ray_max / step_size) * step_size;
+	int step_mtp = 1;
 
 	int i = 0;
 	
@@ -169,7 +173,7 @@ void main()
 		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i);
 		float density = sampleCloudDensity(sample_pos);
 
-		float weight = i < step_cnt ? step_size : step_last;
+		float weight = i < step_cnt ? step_size * float(step_mtp) : step_last + step_size * float(step_mtp - 1);
 
 		if (density > 0.0){
 			// Amount of light sampled point receives from the sun
@@ -179,7 +183,11 @@ void main()
 			// Amount of light reaching camera from this point
 			transmittance *= beersLaw(density * weight, light_absorption);
 		}
-		i++;
+
+		if (transmittance <= 0.0) break;
+		step_mtp = min(int(floor(1.0 / pow(transmittance, step_size_incr))), max(step_cnt - i, 1));
+
+		i += step_mtp;
 	}
 
 
