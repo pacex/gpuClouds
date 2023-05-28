@@ -34,7 +34,7 @@ void NoiseGenerator::renderNoise() {
 	glGenFramebuffers(1, &framebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-	for (int i = 0; i < NT_SIZE; i++) {
+	for (int i = 0; i < NT_SIZE; i++) { // Iterate over layers
 		glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, noiseTexture, 0, i);
 		glViewport(0, 0, NT_SIZE, NT_SIZE);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

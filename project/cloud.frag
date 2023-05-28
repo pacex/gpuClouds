@@ -132,10 +132,13 @@ void main()
 
 	vec4 sampled_ndc = vec4(ndc.xy, sampled_depth, 1.0);
 	vec4 sampled_world_4 = (view_inverse * proj_inverse * sampled_ndc);
-	vec3 sampled_world = sampled_world_4.xyz / sampled_world_4.w;
+	vec3 sampled_world = sampled_world_4.xyz / sampled_world_4.w;		// Reconstruct world space position of possibly occluding geometry
 
 	// Get view ray intersections with cloud container
-	vec3 model_campos = (model_inverse * view_inverse * vec4(vec3(0.0), 1.0)).xyz;		// Perform itsc check in model space to allow for rotation in world space
+	/*
+		Ray intersection with cloud volume is done against unit cube in model space. This allows for arbitrary transformations.
+	*/
+	vec3 model_campos = (model_inverse * view_inverse * vec4(vec3(0.0), 1.0)).xyz;
 	vec3 model_ray = normalize(model_position - model_campos);
 
 	vec3 ts_lower = (vec3(-1.0) - model_campos) / model_ray;
@@ -147,8 +150,8 @@ void main()
 	float t_min = max(ts_min.x, max(ts_min.y, ts_min.z));
 	float t_max = min(ts_max.x, min(ts_max.y, ts_max.z));
 
-	vec3 world_itsc_in = (model * vec4(model_campos + model_ray * t_min, 1.0)).xyz;
-	vec3 world_itsc_out = (model * vec4(model_campos + model_ray * t_max, 1.0)).xyz;
+	vec3 world_itsc_in = (model * vec4(model_campos + model_ray * t_min, 1.0)).xyz;		// World space pos of ray itsc into cloud volume
+	vec3 world_itsc_out = (model * vec4(model_campos + model_ray * t_max, 1.0)).xyz;	// World space pos of ray itsc out of cloud volume
 
 
 	// Ray marching
@@ -156,26 +159,24 @@ void main()
 	float light_energy = 0.0;
 
 	vec3 ray_direction = normalize(world_itsc_out - world_itsc_in);
-	float cos_angle = dot(ray_direction, light_direction);
+	float cos_angle = dot(ray_direction, light_direction);			// Angle between view and light direction for forward scattering
 
-	float ray_max = length(world_itsc_out - world_itsc_in); // Cut off ray when it hits geometry (i.e depth exceeds depth buffer)
-	ray_max = max(min(ray_max, dot(sampled_world - world_itsc_in, ray_direction)), 0.0);
+	float ray_max = length(world_itsc_out - world_itsc_in); 
+	ray_max = max(min(ray_max, dot(sampled_world - world_itsc_in, ray_direction)), 0.0);	// Cut off ray when it hits geometry (i.e depth exceeds depth buffer)
 
 	vec3 world_position = (model * vec4(model_position, 1.0)).xyz; // TODO: get min ray cutoff to work
 	//float ray_min = max(0.0, dot(world_position - world_itsc_in, ray_direction));
-
 	//float ray_len = max(0.0, ray_max - ray_min);
 
 	int step_cnt = int(floor(ray_max / step_size));
-	float step_last = fract(ray_max / step_size) * step_size;
+	float step_last = fract(ray_max / step_size) * step_size;	// Length of last step
 	int step_mtp = 1;
 
 	int i = 0;
-	
-	while(i <= step_cnt){
+	while(i <= step_cnt){	// Ray marching loop
 		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i);
 
-		if (blue_noise_offset_factor > 0.0){
+		if (blue_noise_offset_factor > 0.0){	// Offset sample position
 			vec4 sample_ndc_pos = pv * vec4(sample_pos, 1.0);
 			sample_ndc_pos /= sample_ndc_pos.w;
 			vec2 sample_screen_pos = sample_ndc_pos.xy * 0.5 + 0.5;
@@ -187,11 +188,12 @@ void main()
 		}
 
 		
-		float density = sampleCloudDensity(sample_pos);
+		float density = sampleCloudDensity(sample_pos);	// Sample density volume
 
-		float weight = i < step_cnt ? step_size * float(step_mtp) : step_last + step_size * float(step_mtp - 1);
+		// Weight of current step proportional to step length
+		float weight = i < step_cnt ? /* Any step but last */ step_size * float(step_mtp) : /* Last step */ step_last + step_size * float(step_mtp - 1);
 
-		if (density > 0.0){
+		if (density > 0.0){ // Skip marching light ray if density sample == 0
 			// Amount of light sampled point receives from the sun
 			float light_transmittance = marchLightRay(sample_pos) * max(henyey_greenstein(cos_angle, forward_scattering), 1.0);
 			light_energy += density * transmittance * light_transmittance * weight;
@@ -200,8 +202,8 @@ void main()
 			transmittance *= beersLaw(density * weight, light_absorption);
 		}
 
-		if (transmittance <= 0.0) break;
-		step_mtp = min(int(floor(1.0 / pow(transmittance, step_size_incr))), max(step_cnt - i, 1));
+		if (transmittance <= 0.0) break;	// Stop marching if transmittance reaches 0
+		step_mtp = min(int(floor(1.0 / pow(transmittance, step_size_incr))), max(step_cnt - i, 1)); // Skip steps if transmittance is low enough
 
 		i += step_mtp;
 	}

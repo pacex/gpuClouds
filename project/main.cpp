@@ -115,19 +115,19 @@ float previewLayer = 0.0;
 bool displayPreview = false;
 int previewChannel = 0;
 
-float densityThreshold = 0.656f;
-float densityMultiplier = 1.0f;
-float lightAbsorption = 1.6f;
-float lightAbsorptionSun = 0.666f;
-float darknessThreshold = 0.267f;
-float stepSize = 4.0f;
-float stepSizeSun = 16.0f;
-float stepSizeIncr = 0.0;
-float stepSizeIncrSun = 0.0;
-float cloudScale = 0.0022f;
-float cloudSpeed = 10.0f;
-float forwardScattering = 0.678f;
-float blueNoiseOffsetFactor = 0.0f;
+float densityThreshold = 0.656f;		// Threshold is subtracted from density samples, remaining value clamped to a min bound of 0
+float densityMultiplier = 1.0f;			// Factor for density samples
+float lightAbsorption = 1.6f;			// How much light is absorbed along view rays
+float lightAbsorptionSun = 0.666f;		// How much light is absorbed along light rays
+float darknessThreshold = 0.267f;		// Lower bound for cloud brightness
+float stepSize = 4.0f;					// Interval length between steps along view rays
+float stepSizeSun = 16.0f;				// Interval length between steps along light rays
+float stepSizeIncr = 0.0;				// Values above zero increase step size along view rays with decreasing transmittance
+float stepSizeIncrSun = 0.0;			// Values above zero increase step size along light rays with decreasing transmittance
+float cloudScale = 0.0022f;				// Scaling factor from world to noise-texture space
+float cloudSpeed = 10.0f;				// Cloud movement speed
+float forwardScattering = 0.678f;		// Forward-scattering input to the Henyey-Greenstein function
+float blueNoiseOffsetFactor = 0.0f;		// Defines how much samples should be offset randomly along view ray to trade banding artifacts for noise
 
 void loadShaders(bool is_reload)
 {
@@ -402,13 +402,6 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 1024.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
-
-	/*
-	vec4 lightStartPosition = vec4(40.0f, 40.0f, 0.0f, 1.0f);
-	lightDirection = vec3(rotate(currentTime, worldUp) * lightStartPosition);
-	mat4 lightViewMatrix = lookAt(lightDirection, vec3(0.0f), worldUp);
-	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
-	*/
 
 	lightDirection = normalize(vec3(1.0f, 0.15f, 1.0f));
 
