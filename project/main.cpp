@@ -126,7 +126,7 @@ float stepSizeIncr = 0.0;
 float stepSizeIncrSun = 0.0;
 float cloudScale = 0.0022f;
 float cloudSpeed = 10.0f;
-float forwardScattering = 0.738f;
+float forwardScattering = 0.678f;
 float blueNoiseOffsetFactor = 0.0f;
 
 void loadShaders(bool is_reload)
@@ -596,7 +596,7 @@ void gui()
 	ImGui::SliderFloat("Light Absorption Sun", &lightAbsorptionSun, 0.0, 2.0);
 	ImGui::SliderFloat("Darkness Threshold", &darknessThreshold, 0.0, 1.0);
 	ImGui::SliderFloat("Forward-Scattering", &forwardScattering, 0.0, 1.0);
-	ImGui::SliderFloat("Offset Factor", &blueNoiseOffsetFactor, 0.0, 5.0);
+	ImGui::SliderFloat("Offset Factor", &blueNoiseOffsetFactor, 0.0, 16.0);
 
 	// Noise
 	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Noise Generation:");

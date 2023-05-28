@@ -175,17 +175,19 @@ void main()
 	while(i <= step_cnt){
 		vec3 sample_pos = world_itsc_in + ray_direction * (step_size * i);
 
-		vec4 sample_ndc_pos = pv * vec4(sample_pos, 1.0);
-		sample_ndc_pos /= sample_ndc_pos.w;
-		vec2 sample_screen_pos = sample_ndc_pos.xy * 0.5 + 0.5;
-
-		vec3 sample_offset = vec3(0.0);
 		if (blue_noise_offset_factor > 0.0){
-			sample_offset = (texture(sample_offset_texture, sample_screen_pos).rgb * 2.0 - 1.0) * blue_noise_offset_factor;
+			vec4 sample_ndc_pos = pv * vec4(sample_pos, 1.0);
+			sample_ndc_pos /= sample_ndc_pos.w;
+			vec2 sample_screen_pos = sample_ndc_pos.xy * 0.5 + 0.5;
+
+			float sample_offset = 0.0;
+
+			sample_offset = (texture(sample_offset_texture, sample_screen_pos).r * 2.0 - 1.0) * blue_noise_offset_factor;
+			sample_pos += sample_offset * ray_direction;
 		}
 
-
-		float density = sampleCloudDensity(sample_pos + sample_offset);
+		
+		float density = sampleCloudDensity(sample_pos);
 
 		float weight = i < step_cnt ? step_size * float(step_mtp) : step_last + step_size * float(step_mtp - 1);
 
