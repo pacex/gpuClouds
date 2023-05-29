@@ -54,8 +54,7 @@ unsigned int screenDepthTexture;
 ///////////////////////////////////////////////////////////////////////////////
 GLuint shaderProgram;       // Shader for rendering geometry
 GLuint backgroundProgram;	// Shader for rendering environment map as background
-GLuint cloudProgram;		// Shader for rendering cloud container
-GLuint cloudInsideProgram;	// Shader for rendering clouds if camera is inside cloud container
+GLuint cloudProgram;		// Shader for rendering clouds
 GLuint screenProgram;		// Shader for rendering screen buffer to screen
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -97,12 +96,13 @@ vec3 worldUp(0.0f, 1.0f, 0.0f);
 ///////////////////////////////////////////////////////////////////////////////
 labhelper::Model* fighterModel = nullptr;
 labhelper::Model* landingpadModel = nullptr;
-labhelper::Model* cloudContainer = nullptr;
 
 mat4 roomModelMatrix;
 mat4 landingPadModelMatrix;
 mat4 fighterModelMatrix;
-mat4 cloudContainerModelMatrix;
+
+vec3 cloudContainerMin;
+vec3 cloudContainerMax;
 
 float shipSpeed = 50;
 
@@ -117,17 +117,17 @@ int previewChannel = 0;
 
 float densityThreshold = 0.656f;		// Threshold is subtracted from density samples, remaining value clamped to a min bound of 0
 float densityMultiplier = 1.0f;			// Factor for density samples
-float lightAbsorption = 1.6f;			// How much light is absorbed along view rays
-float lightAbsorptionSun = 0.666f;		// How much light is absorbed along light rays
+float lightAbsorption = 0.748f;			// How much light is absorbed along view rays
+float lightAbsorptionSun = 0.585f;		// How much light is absorbed along light rays
 float darknessThreshold = 0.267f;		// Lower bound for cloud brightness
 float stepSize = 4.0f;					// Interval length between steps along view rays
 float stepSizeSun = 16.0f;				// Interval length between steps along light rays
-float stepSizeIncr = 0.0;				// Values above zero increase step size along view rays with decreasing transmittance
-float stepSizeIncrSun = 0.0;			// Values above zero increase step size along light rays with decreasing transmittance
-float cloudScale = 0.0022f;				// Scaling factor from world to noise-texture space
+float stepSizeIncr = 0.5;				// Values above zero increase step size along view rays with decreasing transmittance
+float stepSizeIncrSun = 0.4;			// Values above zero increase step size along light rays with decreasing transmittance
+float cloudScale = 0.22f;				// Scaling factor from world to noise-texture space
 float cloudSpeed = 10.0f;				// Cloud movement speed
-float forwardScattering = 0.678f;		// Forward-scattering input to the Henyey-Greenstein function
-float blueNoiseOffsetFactor = 0.0f;		// Defines how much samples should be offset randomly along view ray to trade banding artifacts for noise
+float forwardScattering = 0.684f;		// Forward-scattering input to the Henyey-Greenstein function
+float blueNoiseOffsetFactor = 0.7f;		// Defines how much samples should be offset randomly along view ray to trade banding artifacts for noise
 
 void loadShaders(bool is_reload)
 {
@@ -143,16 +143,10 @@ void loadShaders(bool is_reload)
 		shaderProgram = shader;
 	}
 
-	shader = labhelper::loadShaderProgram("../project/cloud.vert", "../project/cloud.frag", is_reload);
+	shader = labhelper::loadShaderProgram("../project/fullscreenQuad.vert", "../project/cloud.frag", is_reload);
 	if (shader != 0)
 	{
 		cloudProgram = shader;
-	}
-
-	shader = labhelper::loadShaderProgram("../project/cloudInside.vert", "../project/cloud.frag", is_reload);
-	if (shader != 0)
-	{
-		cloudInsideProgram = shader;
 	}
 
 	shader = labhelper::loadShaderProgram("../project/fullScreenQuad.vert", "../project/screen.frag", is_reload);
@@ -213,12 +207,14 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////
 	fighterModel = labhelper::loadModelFromOBJ("../scenes/space-ship.obj");
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/city.obj");
-	cloudContainer = labhelper::loadModelFromOBJ("../scenes/cube.obj");
 
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = scale(vec3(2.6f));
-	cloudContainerModelMatrix = translate(96.0f * worldUp) * scale(vec3(512.0f, 16.0f, 512.0f));
+
+	float horExtent = 1024.0f;
+	cloudContainerMin = vec3(-horExtent, 80.0f, -horExtent);
+	cloudContainerMax = vec3(horExtent, 128.0f, horExtent);
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -314,38 +310,20 @@ void drawScene(GLuint currentShaderProgram,
 void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 
 	GLuint shaderProgram;
-	mat4 modelInverse = inverse(cloudContainerModelMatrix);
-	vec3 camPosModel = vec3(modelInverse * vec4(cameraPosition, 1.0));
-
-	bool cameraInVolume = camPosModel.x >= -1.0f && camPosModel.x <= 1.0f &&
-							camPosModel.y >= -1.0f && camPosModel.y <= 1.0f &&
-							camPosModel.z >= -1.0f && camPosModel.z <= 1.0f;
-
-	cameraInVolume = false; // TODO: remove this once min ray cutoff works
 
 
-	// Vertex shader uniforms
-	if (cameraInVolume) {
-		// Camera inside cloud volume
-		shaderProgram = cloudInsideProgram;
-		glUseProgram(shaderProgram);
-		labhelper::setUniformSlow(shaderProgram, "inv_PVM", inverse(projectionMatrix * viewMatrix * cloudContainerModelMatrix));
-	}
-	else {
-		// Camera outside cloud volume
-		shaderProgram = cloudProgram;
-		glUseProgram(shaderProgram);
-		labhelper::setUniformSlow(shaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * cloudContainerModelMatrix);
-	}
+	shaderProgram = cloudProgram;
+	glUseProgram(shaderProgram);
 
 	// Fragment shader uniforms
 	labhelper::setUniformSlow(shaderProgram, "pv", projectionMatrix * viewMatrix);
 	labhelper::setUniformSlow(shaderProgram, "proj_inverse", inverse(projectionMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view_inverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(shaderProgram, "view", viewMatrix);
-	labhelper::setUniformSlow(shaderProgram, "model_inverse", inverse(cloudContainerModelMatrix));
-	labhelper::setUniformSlow(shaderProgram, "model", cloudContainerModelMatrix);
 	
+	labhelper::setUniformSlow(shaderProgram, "container_min", cloudContainerMin);
+	labhelper::setUniformSlow(shaderProgram, "container_max", cloudContainerMax);
+
 	labhelper::setUniformSlow(shaderProgram, "light_direction", lightDirection);
 	labhelper::setUniformSlow(shaderProgram, "light_color", lightColor);
 	labhelper::setUniformSlow(shaderProgram, "density_threshold", densityThreshold);
@@ -363,8 +341,7 @@ void drawCloudContainer(const mat4& viewMatrix, const mat4& projectionMatrix) {
 	labhelper::setUniformSlow(shaderProgram, "forward_scattering", forwardScattering);
 	labhelper::setUniformSlow(shaderProgram, "blue_noise_offset_factor", blueNoiseOffsetFactor);
 
-	if (cameraInVolume) labhelper::drawFullScreenQuad();
-	else labhelper::render(cloudContainer);
+	labhelper::drawFullScreenQuad();
 	
 }
 
@@ -400,7 +377,7 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 1024.0f);
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 4096.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	lightDirection = normalize(vec3(1.0f, 0.15f, 1.0f));

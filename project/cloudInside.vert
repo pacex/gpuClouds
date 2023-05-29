@@ -13,6 +13,5 @@ void main()
 	clip_position = gl_Position;
 
 	vec4 pixel_model_pos = inv_PVM * vec4(gl_Position.xy, 1.0, 1.0);
-	pixel_model_pos = (1.0 / pixel_model_pos.w) * pixel_model_pos;
-	model_position = pixel_model_pos.xyz;
+	model_position = pixel_model_pos.xyz / pixel_model_pos.w;
 }
